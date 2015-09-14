@@ -1,0 +1,85 @@
+
+print "Timer Started";
+alias current_PID S0;
+
+current_PID=(PTBR- 1024)/8; 				//calculating PID of the process 
+alias current_PCB S1;
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////|Process Control Block|////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+////|0	 |   1 	   | 2	 |  3  | 4	|  5   |  6   |	 7-14	|15-30	                    |    31     |////
+////|PID |	STATE  | BP	 |  SP | IP	| PTBR | PTLR | R0 - R7	|Per-Process Open File Table|...Free... |////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+current_PCB = READY_LIST + 32 * current_PID;		 //calculating location of the PCB;
+
+[current_PCB + 1]=1; //set STATE to READY;
+
+[current_PCB +2]=BP;
+[current_PCB +3]=SP - 1;
+
+//logical page number =logical address / 512;
+//location of the  page table entry = PTBR +2*(logical address / 512);
+//Physical page number = [location of page table entry + 0];		
+alias Physical_SP S2;
+Physical_SP = (([PTBR + 2*(SP/512)] * 512 )+(SP % 512));
+
+[current_PCB + 4]= [Physical_SP]; 				 //save the current SP in the PCB from the stack 
+[current_PCB + 5] = PTBR;  	   				    //set PTBR fields of the PCB
+[current_PCB + 6] = PTLR;  					   //set PTBR fields of PCB
+
+//save the Registers R0-R7 in the PCB 
+
+[current_PCB +  7] =R0;
+[current_PCB +  8] =R1;
+[current_PCB +  9] =R2;
+[current_PCB + 10] =R3;
+[current_PCB + 11] =R4;
+[current_PCB + 12] =R5;
+[current_PCB + 13] =R6;
+[current_PCB + 14] =R7;
+
+
+alias newPID S4;
+
+newPID = (current_PID + 1)%32;
+
+while([READY_LIST + 32*newPID +1]!=1) do
+    	
+    newPID=(newPID +1 )%32;
+endwhile;
+ 
+
+//SP = SP + 1; 			//increment stack by 1 to getting IP in PCB back;
+
+
+alias newPCB S3;
+
+newPCB = READY_LIST +32 *newPID;
+
+
+BP   = [newPCB + 2];
+SP   = [newPCB + 3];
+PTBR = [newPCB + 5];
+PTLR = [newPCB + 6];
+R0   = [newPCB + 7];
+R1   = [newPCB + 8];
+R2   = [newPCB + 9];
+R3   = [newPCB + 10];
+R4   = [newPCB + 11];
+R5   = [newPCB + 12];
+R6   = [newPCB + 13];
+R7   = [newPCB + 14];
+SP   = SP + 1;
+
+alias newPhysical_SP S2;
+newPhysical_SP = (([PTBR + 2*(SP /512)] *512 )+(SP % 512));    //calculate the physical address of the SP
+[newPhysical_SP] = [newPCB + 4];							  //STORE IP field of the PCB on the  STACK
+
+
+
+[newPCB + 1]=2; //set STATE to RUNNING;
+
+//SP = SP -1;
+print "Timer Ended";
+ireturn;
