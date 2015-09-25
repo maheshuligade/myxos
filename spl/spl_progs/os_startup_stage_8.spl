@@ -1,0 +1,88 @@
+//load exception handler
+load(7,1);  
+load(8,2);
+
+//load intrupt 7 routine
+load(23,17); 
+load(24,18); 
+
+//Sets the pid as 0
+[READY_LIST + 0]=0; 
+
+//load init process 
+load(25,21);
+load(26,22);
+load(27,23);
+
+//set page table base register
+PTBR=1024;
+//set page table length register
+PTLR=4;
+
+//setup page table for init process
+
+[PTBR + 0]=25;
+[PTBR + 1]="01";
+[PTBR + 2]=26;
+[PTBR + 3]="01";
+[PTBR + 4]=27;
+[PTBR + 5]="01";
+[PTBR + 6]=28;
+[PTBR + 7]="01";
+
+//set process status as running
+[READY_LIST + 1]=2;
+
+//set stack pointer to 3*512;
+SP=3*512;
+//set IP value of the init process as 0
+[28*512]=0;
+
+//load intrupt 1 routine from disk to memory
+load(11,5);
+load(12,6);
+//load timer intrupt from disk to memory
+load(9,3);
+load(10,4);
+//load FAT table from disk to memory
+load(5,19);
+//load disk free list from disk to memory
+load(6,20);
+
+//set containts of the system wide open file table as invalid,
+//because there is no file is open when os starts
+//an invalid entry is indicated by -1 in the FAT Index
+//The File open count set to 0 for all entries
+alias counter S0;
+counter = 0;
+
+while(counter < 512) do  //64 entries each of size 2 words
+       	 
+  [FILE_TABLE + 0]=-1; //sets the  FAT index to -1
+  [FILE_TABLE + 1]=0;  // sets the file open count to 0
+   counter = counter + 2;
+endwhile;
+
+
+//sets the all entries of the per process open file table as invalid
+alias i S1;
+i=15;
+while(i<31) do
+    	
+  [PTBR + i + 0]=-1;//sets pointer to system wide open file table entry as -1
+  [PTBR + i + 1]=-1;//sets the LSEEK position to -1
+  i=i+2;
+endwhile;
+
+//load intrupt 2 routine 
+load(13,7);
+load(14,8);
+//load intrupt 3 routine
+load(15,9);
+load(16,10);
+//load intrupt 4 routine 
+load(17,11);
+load(18,12);
+
+
+ireturn;

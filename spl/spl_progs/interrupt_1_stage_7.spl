@@ -11,6 +11,8 @@ print SysCallNo;
 
 breakpoint;
 
+
+
 if (SysCallNo==1) then
    //Implementation of Create();,Interrupt NO. 1,
    //arguments:filename,Return value=-1(failure),0(success);
@@ -96,7 +98,7 @@ if (SysCallNo==1) then
    [FreeFatLoc + 0]=File_name;
    [FreeFatLoc + 1]=0;
    [FreeFatLoc + 2]=free_block;
-
+   
    load(1,free_block);
 
    alias i S5;
@@ -118,15 +120,6 @@ if (SysCallNo==1) then
   store(5,19);
   store(6,20);
   ireturn;
-
-
-
-
-
-
-
-
-	
 endif;
 
 //if (SysCallNo==2) then
