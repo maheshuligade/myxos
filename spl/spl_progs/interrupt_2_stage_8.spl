@@ -18,6 +18,7 @@ if (SysCallNo==2) then
   //              or  index of open instance in per process 
   //              file open file table (Success)
  
+  //step 1
   //take filename from the stack
   alias File_Name S2;
   File_Name=[Physical_SP - 3];
@@ -26,101 +27,108 @@ if (SysCallNo==2) then
 
   //Check the given  file is present in the  disk or not
 
-  alias Current_File S3;
-  Current_File=FAT;
+  alias FAT_Index S3;
+  FAT_Index=0;
 
-  while(Current_File < (FAT + 512)) do
-      	if ([Current_File + 0]==File_Name) then
+  while(FAT_Index < 64) do
+      	if ([FAT_Index*8 + FAT]==File_Name) then
       	  
       	  print "File Exists";
       	  break;
 
       	endif;
     
-  	 Current_File=Current_File+8;
+  	 FAT_Index=FAT_Index+1;
   endwhile;
 
-  if (Current_File==512) then
+  if (FAT_Index==64) then
       print "File Not Exists";
-      [Physical_SP - 1]=-1;
+      [Physical_SP - 2]=-1;
       ireturn;	
   endif;
   
   //Store the fat index of the file in the register
-  alias FAT_Index S4;
-  FAT_Index=Current_File;
+ // alias FAT_Index S4;
+  //FAT_Index=FAT_Index;
 
+ //step 2
  //search the fat index is present in the system wide open file table
-  alias SWOFT S5;
-  SWOFT=FILE_TABLE;
-  while(SWOFT<(FILE_TABLE + 128)) do
-    if ([SWOFT + 0]==FAT_Index) then
+  alias SWOFTI S4;
+  SWOFTI=0;
+  while(SWOFTI<64) do
+    if ([SWOFTI*2 + FILE_TABLE]==FAT_Index) then
         
-        print "SWOFT FAT FOUND";
-        [SWOFT + 1]=[SWOFT + 1] + 1;
+        print "SWOFTI FAT FOUND";
+        //[SWOFTI + 1]=[SWOFTI + 1] + 1;
        break;
 
     endif;
-    SWOFT=SWOFT+2;
+    SWOFTI=SWOFTI+1;
   endwhile;
   
-  if (SWOFT==(FILE_TABLE + 128)) then
-  	 print "SWOFT NOT FOUND";
+  if (SWOFTI==64) then
+  	 print "SWOFTI NOT FOUND";
      //No FAT index entry in the System Wide Open File Table
-     SWOFT=FILE_TABLE;
-     while(SWOFT<(FILE_TABLE + 128)) do
-        if ([SWOFT + 0]==-1) then       
+     SWOFTI=0;
+     while(SWOFTI<64) do
+        if ([SWOFTI*2 + FILE_TABLE]==-1) then       
         
-        print "Free SWOFT entry";
+        print "Free SWOFTI entry";
         break;
        
         endif;
-        SWOFT=SWOFT+2;
+        SWOFTI=SWOFTI+1;
      endwhile;
-    if (SWOFT==(FILE_TABLE + 128)) then
+    if (SWOFTI==64) then
         	
-    	print "No free SWOFT";
-    	[Physical_SP - 1]=-1;
+    	print "No free SWOFTI";
+    	[Physical_SP - 2]=-1;
     	ireturn;
     endif;
   	
   endif;
-	alias SWOFT_FAT S6;
-	SWOFT_FAT=SWOFT;
-  
-	alias Current_PID S7;
+  print "SWOFTI";
+  print SWOFTI;
+
+	alias SWOFTI_FAT S5;
+	SWOFTI_FAT=SWOFTI;
+  //step 3
+	alias Current_PID S6;
 	Current_PID = (PTBR - 1024)/8;
 
-	alias Current_PCB S8;
-	Current_PCB = READY_LIST + 32*Current_PID;
+	alias PPFTIStart S7;
+	PPFTIStart = READY_LIST + 32*Current_PID + 15;
 
-	alias i S9;
-	i=15;
-	while(i < 31) do
+	alias PPFTI S9;
+	PPFTI=0;
+	while(PPFTI < 8) do
  
- 		if ([Current_PCB + i ]==-1) then
+ 		if ([PPFTIStart + 2*PPFTI]==SWOFTI) then
         	
-  			print "Free PCB entry"; 
+  			print "Free PPFTI entry"; 
   			break;
  		endif;   
-  
- 		i=i+2;
-	endwhile;
 
-	if (i==31) then
-    	
- 	[Physical_SP - 1]=-1;
- 	ireturn;
-	else 
- 	[Current_PCB + i + 0]=SWOFT_FAT; //Set pointer to System Wide open 
+    if ([PPFTIStart + 2*PPFTI]==-1) then
+        [PPFTIStart + 2*PPFTI + 0]=SWOFTI_FAT; //Set pointer to System Wide open 
                                   //file table entry to System Wide 
                                   //Open File Table fat index 
- 	[Current_PCB + i + 1]=0;        //sets LSEEK position to 0
-
+        [PPFTIStart + 2*PPFTI + 1]=0;        //sets LSEEK position to 0
+        break;
+    endif;
+    PPFTI=PPFTI+1;
+       
+	endwhile;
+    
+	if (PPFTI==8) then
+    	print "No PPFTI entry";
+ 		[Physical_SP - 2]=-1;
+ 		ireturn;
 	endif;
-	SWOFT_FAT=FAT_Index;
-	[SWOFT_FAT + 1]=[SWOFT_FAT + 1] + 1;
+	[FILE_TABLE + 2*SWOFTI_FAT]=FAT_Index;
+	[FILE_TABLE + 2*SWOFTI_FAT + 1]=[FILE_TABLE + 2*SWOFTI_FAT + 1] + 1;
 
-	[Physical_SP - 1]=FAT_Index;
+	[Physical_SP - 2]=PPFTI;
+
 	ireturn;
 endif;

@@ -48,7 +48,7 @@ load(10,4);
 load(5,19);
 //load disk free list from disk to memory
 load(6,20);
-
+//step 1
 //set containts of the system wide open file table as invalid,
 //because there is no file is open when os starts
 //an invalid entry is indicated by -1 in the FAT Index
@@ -63,7 +63,7 @@ while(counter < 512) do  //64 entries each of size 2 words
    counter = counter + 2;
 endwhile;
 
-
+//step 2
 //sets the all entries of the per process open file table as invalid
 alias i S1;
 i=15;
@@ -74,6 +74,7 @@ while(i<31) do
   i=i+2;
 endwhile;
 
+//step 3
 //load intrupt 2 routine 
 load(13,7);
 load(14,8);
