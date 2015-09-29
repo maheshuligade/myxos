@@ -48,8 +48,7 @@ if (SysCallNo==2) then
   endif;
   
   //Store the fat index of the file in the register
- // alias FAT_Index S4;
-  //FAT_Index=FAT_Index;
+ 
 
  //step 2
  //search the fat index is present in the system wide open file table
@@ -59,7 +58,7 @@ if (SysCallNo==2) then
     if ([SWOFTI*2 + FILE_TABLE]==FAT_Index) then
         
         print "SWOFTI FAT FOUND";
-        //[SWOFTI + 1]=[SWOFTI + 1] + 1;
+        
        break;
 
     endif;
@@ -108,18 +107,20 @@ if (SysCallNo==2) then
   			print "Free PPFTI entry"; 
   			break;
  		endif;   
-
+         
     if ([PPFTIStart + 2*PPFTI]==-1) then
-        [PPFTIStart + 2*PPFTI + 0]=SWOFTI_FAT; //Set pointer to System Wide open 
-                                  //file table entry to System Wide 
-                                  //Open File Table fat index 
-        [PPFTIStart + 2*PPFTI + 1]=0;        //sets LSEEK position to 0
+    	//Set pointer to System Wide open file table entry to System Wide 
+    	//Open File Table fat index 
+
+        [PPFTIStart + 2*PPFTI + 0]=SWOFTI_FAT; 
+        //sets LSEEK position to 0
+        [PPFTIStart + 2*PPFTI + 1]=0;        
         break;
     endif;
     PPFTI=PPFTI+1;
        
 	endwhile;
-    
+
 	if (PPFTI==8) then
     	print "No PPFTI entry";
  		[Physical_SP - 2]=-1;
@@ -127,8 +128,76 @@ if (SysCallNo==2) then
 	endif;
 	[FILE_TABLE + 2*SWOFTI_FAT]=FAT_Index;
 	[FILE_TABLE + 2*SWOFTI_FAT + 1]=[FILE_TABLE + 2*SWOFTI_FAT + 1] + 1;
-
 	[Physical_SP - 2]=PPFTI;
 
 	ireturn;
+endif;
+
+if (SysCallNo==3) then
+  //Close System Call
+  //Description:Close file opened by the process.
+  //System Call No:3
+  //Interrupt No:2
+  //Arguments:fileDescriptor
+  //Return Value: -1(Failure) 0 (Success)
+  
+  //Stage 1
+  //Checking fileDescriptor is valid or not
+  alias fileDescriptor S2;
+  fileDescriptor=[Physical_SP - 3];
+  print "fileDescriptor";
+  print fileDescriptor;
+  
+  
+  if ((0>fileDescriptor)||(fileDescriptor>7)) then
+        
+     print "Invalid fileDescriptor";
+     [Physical_SP - 2]=-1;
+     ireturn;
+
+  endif;
+
+  print "Valid fileDescriptor";
+  print fileDescriptor;
+  //Stage 2
+  //Checking in the PCB of the process PPFT entry is valid or not
+  alias Current_PID S3;
+  Current_PID = (PTBR - 1024)/8;
+  
+  alias PPFTIStart S4;
+  PPFTIStart=READY_LIST + 32*Current_PID +15;
+  
+  
+     
+     //Check SWOFT validity
+     if ([PPFTIStart + 2*fileDescriptor]==-1) then
+       print "Invalid SWOFTI";
+       [Physical_SP - 2]=-1;
+       ireturn;
+     else
+        //Step 3
+        //Index into the SWOFT
+        alias SWOFTI S5;
+        SWOFTI=[PPFTIStart + 2*fileDescriptor];
+        print "FileOpenCount";
+        print  [FILE_TABLE +2*SWOFTI + 1];
+        //Decrese the file open count
+        [FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] - 1;
+
+        //Check the file open count is zero
+        if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+             
+          //Set the entry of the FAT index in the SWOFT to invalid
+          [FILE_TABLE + 2*SWOFTI + 0]=-1; 
+           
+
+          //Invalidate PPFT entry
+          [PPFTIStart + 2*fileDescriptor]=-1;      
+        endif;
+       
+     endif;
+  
+    
+    [Physical_SP - 2]=0;
+    ireturn;
 endif;
