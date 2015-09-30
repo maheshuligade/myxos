@@ -20,6 +20,7 @@ if (SysCallNo==2) then
  
   //step 1
   //take filename from the stack
+  print "Open SysCall";
   alias File_Name S2;
   File_Name=[Physical_SP - 3];
   print "File_Name";
@@ -143,6 +144,7 @@ if (SysCallNo==3) then
   
   //Stage 1
   //Checking fileDescriptor is valid or not
+  print "Close SysCall";
   alias fileDescriptor S2;
   fileDescriptor=[Physical_SP - 3];
   print "fileDescriptor";
@@ -167,10 +169,10 @@ if (SysCallNo==3) then
   alias PPFTIStart S4;
   PPFTIStart=READY_LIST + 32*Current_PID +15;
   
-  
+    
      
      //Check SWOFT validity
-     if ([PPFTIStart + 2*fileDescriptor]==-1) then
+     if ([PPFTIStart + 2*fileDescriptor + 0]==-1) then
        print "Invalid SWOFTI";
        [Physical_SP - 2]=-1;
        ireturn;
@@ -179,8 +181,17 @@ if (SysCallNo==3) then
         //Index into the SWOFT
         alias SWOFTI S5;
         SWOFTI=[PPFTIStart + 2*fileDescriptor];
+        //Check file is open or not stage 8
+        if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+            print "File already closed";
+            [Physical_SP - 2]=-1;
+            ireturn;
+        endif;
+        //File open validity is checked
         print "FileOpenCount";
         print  [FILE_TABLE +2*SWOFTI + 1];
+
+
         //Decrese the file open count
         [FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] - 1;
 
@@ -192,7 +203,8 @@ if (SysCallNo==3) then
            
 
           //Invalidate PPFT entry
-          [PPFTIStart + 2*fileDescriptor]=-1;      
+          [PPFTIStart + 2*fileDescriptor + 0]=-1;
+          [PPFTIStart + 2*fileDescriptor + 1]=-1;            
         endif;
        
      endif;
@@ -201,3 +213,6 @@ if (SysCallNo==3) then
     [Physical_SP - 2]=0;
     ireturn;
 endif;
+print "Invalid SysCallNo";
+[Physical_SP - 2]=-1;
+ireturn;
