@@ -56,10 +56,10 @@ load(6,20);
 alias counter S0;
 counter = 0;
 
-while(counter < 512) do  //64 entries each of size 2 words
+while(counter < 128) do  //64 entries each of size 2 words
        	 
-  [FILE_TABLE + 0]=-1; //sets the  FAT index to -1
-  [FILE_TABLE + 1]=0;  // sets the file open count to 0
+  [FILE_TABLE + counter + 0]=-1; //sets the  FAT index to -1
+  [FILE_TABLE + counter + 1]=0;  // sets the file open count to 0
    counter = counter + 2;
 endwhile;
 
@@ -69,8 +69,8 @@ alias i S1;
 i=15;
 while(i<31) do
     	
-  [PTBR + i + 0]=-1;//sets pointer to system wide open file table entry as -1
-  [PTBR + i + 1]=-1;//sets the LSEEK position to -1
+  [READY_LIST + i + 0]=-1;//sets pointer to system wide open file table entry as -1
+  [READY_LIST + i + 1]=-1;//sets the LSEEK position to -1
   i=i+2;
 endwhile;
 

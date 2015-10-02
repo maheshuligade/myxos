@@ -230,7 +230,7 @@ if (SysCallNo==4) then
         j = j + 1;
       endwhile;
       store(1,DATAB);
-      [DISK_LIST + DATAI]=0;     	
+      [DISK_LIST + DATAB]=0;     	
       
 
       DATAI = DATAI + 1;
@@ -238,14 +238,14 @@ if (SysCallNo==4) then
     endwhile;
    //store(1,basic_block);
     //Erase the content of the basic block
-
+    
     load(1,basic_block);
 
     alias i S9;
     i=0;
     while(i < 512) do
         	
-      [SCRATCHPAD + i]="";
+      [SCRATCHPAD + i]=" ";
       i = i + 1;
     	
     endwhile;

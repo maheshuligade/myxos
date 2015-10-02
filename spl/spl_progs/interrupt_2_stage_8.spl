@@ -52,7 +52,7 @@ if (SysCallNo==2) then
  
 
  //step 2
- //search the fat index is present in the system wide open file table
+ //Search the fat index is present in the system wide open file table
   alias SWOFTI S4;
   SWOFTI=0;
   while(SWOFTI<64) do
@@ -92,7 +92,7 @@ if (SysCallNo==2) then
 
 	alias SWOFTI_FAT S5;
 	SWOFTI_FAT=SWOFTI;
-  //step 3
+  //Step 3
 	alias Current_PID S6;
 	Current_PID = (PTBR - 1024)/8;
 
@@ -112,8 +112,8 @@ if (SysCallNo==2) then
     if ([PPFTIStart + 2*PPFTI]==-1) then
     	//Set pointer to System Wide open file table entry to System Wide 
     	//Open File Table fat index 
-
-        [PPFTIStart + 2*PPFTI + 0]=SWOFTI_FAT; 
+        print "sets pointer";
+        [PPFTIStart + 2*PPFTI + 0]=SWOFTI; 
         //sets LSEEK position to 0
         [PPFTIStart + 2*PPFTI + 1]=0;        
         break;
@@ -121,14 +121,19 @@ if (SysCallNo==2) then
     PPFTI=PPFTI+1;
        
 	endwhile;
-
+   
 	if (PPFTI==8) then
     	print "No PPFTI entry";
  		[Physical_SP - 2]=-1;
  		ireturn;
 	endif;
-	[FILE_TABLE + 2*SWOFTI_FAT]=FAT_Index;
-	[FILE_TABLE + 2*SWOFTI_FAT + 1]=[FILE_TABLE + 2*SWOFTI_FAT + 1] + 1;
+
+  if ([FILE_TABLE + 2*SWOFTI + 0]==-1) then
+      [FILE_TABLE + 2*SWOFTI + 1]=0;
+      
+  endif;
+	[FILE_TABLE + 2*SWOFTI + 0]=FAT_Index;
+	[FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] + 1;
 	[Physical_SP - 2]=PPFTI;
 
 	ireturn;
