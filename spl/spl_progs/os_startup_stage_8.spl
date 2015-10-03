@@ -5,7 +5,7 @@ load(8,2);
 //load intrupt 7 routine
 load(23,17); 
 load(24,18); 
-
+breakpoint;
 //Sets the pid as 0
 [READY_LIST + 0]=0; 
 
