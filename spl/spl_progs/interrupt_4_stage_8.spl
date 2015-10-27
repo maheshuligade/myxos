@@ -125,6 +125,7 @@ if (SysCallNo==5) then
      store(5,19);
      //Store Disk Free List from memory to disk
      store(6,20);
+     DATABlock=Free_block;
      		
 	endif;
 	//Step 7
@@ -140,6 +141,9 @@ if (SysCallNo==5) then
   [SCRATCHPAD + offset]=wordToWrite;
   //Step 9
   //Store back this datablock from memory to disk
+  // print "**************";
+  // print DATABlock;
+  // print "**************";
   store(1,DATABlock);
 
   //Step 10

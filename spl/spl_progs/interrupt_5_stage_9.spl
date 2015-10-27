@@ -1,0 +1,71 @@
+//Fork System Call
+//Description : Replicates the process which invoked this System Call in the memory.
+//System Call No: 8
+//Interrupt No:5
+//Return Value:In the parent parent process,PID of the process created (Success) or -1 (Failure).
+//				In the child process ,-2 for success ,and if it is fails no child process is
+//				created.
+
+//Calculate the physical address of the Stack
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+alias SysCallNo S1;
+SysCallNo=[Physical_SP -1];
+print SysCallNo;
+	if (SysCallNo==8) then
+		print "Fork SysCall";
+		//Step 1
+		//Find a free PCB in the READY_LIST
+
+		//Step 2
+		//Store the PCB_index of the free PCB into the register
+		alias PCB_index S2;
+		PCB_index=0;
+		while(PCB_index < 32) do
+			if ([READY_LIST + 32*PCB_index + 1]==0) then
+				print "Free PCB found";
+				break;
+			endif;
+			PCB_index=PCB_index+1;
+		endwhile;
+
+		if (PCB_index==32) then
+			print "No free PCB";
+			[Physical_SP - 2]=-1;
+			ireturn;
+		endif;
+
+		//Step 3
+		//Set the PID value of the child process with the value obtained in step 2
+		print PCB_index;
+		[READY_LIST + 32*PCB_index + 0]=PCB_index;
+
+		// //Step 4
+		// //Count the pages in the PPFT of the parent process
+		alias Current_PID S3;
+		Current_PID=(PTBR - 1024)/8;
+		alias PPFTStart S4;
+		PPFTStart=PTBR + 32*Current_PID;
+		alias ValidPg S5;
+		ValidPg=0;
+		alias i S6;
+		i=0;
+		while(i<8) do
+			if ([PPFTStart + i]="01") then
+				ValidPg=ValidPg + 1;
+			endif;
+			if ([PPFTStart + i]="11") then
+				ValidPg=ValidPg + 1;    					
+			endif;
+		   	print [PPFTStart + i];
+		   	i=i+1; 			  
+		endwhile;
+		print ValidPg;
+		//PTBR=(1024+8*Current_PID);
+
+		//Check equal no of pages in the MEM_LIST as in the parents per process page table 
+
+
+	[Physical_SP -2]=0;
+	ireturn;
+	endif;
