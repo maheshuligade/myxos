@@ -97,12 +97,12 @@ load(24,18);
 //Set MEM_LIST entries from 0 to 24 as used(1) and all other as unsed(0)
 alias j S2;
 j=0;
-while(j <= 28) do    	
+while(j <= 25) do    	
 	[MEM_LIST + j]=1;
 	j=j+1;
 endwhile;
-j=29;
-while(j< MEM_LIST + 64) do
+j=25;
+while(j< 64) do
 	[MEM_LIST + j]=0;
 	j=j+1;	
 endwhile;
@@ -110,10 +110,26 @@ endwhile;
 //Set all PCBs with STATE field 0
 alias k S3;
 k=1;
-[READY_LIST + 32*0 + 1]=2;
+//[READY_LIST + 32*0 + 1]=2;
 while(k< 32) do  	
 	[READY_LIST + 32*k + 1]=0;
 	k=k+1;
 endwhile;
+
+//Added for fork 
+[READY_LIST + 2] = BP;
+[READY_LIST + 5] = PTBR;                 //set PTBR fields of the PCB
+[READY_LIST + 6] = PTLR;              //set PTBR fields of PCB
+
+//save the Registers R0-R7 in the PCB 
+
+[READY_LIST +  7] =R0;
+[READY_LIST +  8] =R1;
+[READY_LIST +  9] =R2;
+[READY_LIST + 10] =R3;
+[READY_LIST + 11] =R4;
+[READY_LIST + 12] =R5;
+[READY_LIST + 13] =R6;
+[READY_LIST + 14] =R7;
 
 ireturn;
