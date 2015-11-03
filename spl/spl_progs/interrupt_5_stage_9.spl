@@ -168,76 +168,7 @@ print SysCallNo;
 		//Step 13
 		//Control is passed to the parent process
 		breakpoint;
+		//Set the parent PID at the 31 location of the child PCB
+		[PCB_Child + 31]=Parent_PID;
 		ireturn;
-
-
-
-		// alias PPFTStart S7;
-		// PPFTStart=PTBR + 32*Parent_PID;
-		// alias ValidPg S8;
-		// ValidPg=0;
-		// //alias i S8;
-
-		// //i=0;
-		// while(i<8) do
-		// 	// if ([PPFTStart + i]=="01") then
-		// 	// 	ValidPg=ValidPg + 1;
-		// 	// endif;
-		// 	// if ([PPFTStart + i]=="11") then
-		// 	// 	ValidPg=ValidPg + 1;    					
-		// 	// endif;
-		//    	print [Par + i];
-		//    	i=i+1;			  
-		// endwhile;
-		// print "ValidPg";
-		// print ValidPg;
-
-		// //PTBR=(1024+8*Parent_PID);
-
-		// //Check equal no of page_index in the MEM_LIST as in the parents per process page_index table
-		// alias FreePgs S9;
-		// FreePgs=0;
-		// i=0;
-
-		// while(i<64) do
-		//    if ([MEM_LIST + i]==0) then
-		//    		FreePgs=FreePgs+1;
-		//    endif;
-		//    i=i+1;			
-		// endwhile;
-		// if (ValidPg>FreePgs) then
-		// 	print "Insufficent Memory";
-		// 	[Physical_SP-2]=-1;
-		// 	ireturn;
-		// endif;
-
-		// //[READY_LIST + 32*PCB_index +]
-		// //Allocate equal no of free page to the child as the parent proocess
-		// i=0;
-		// alias j S10;
-		// j=0;
-		// alias k S11;
-		// while(ValidPg!=0) do
-		// 	if ([MEM_LIST + i]==0) then
-		// 		[MEM_LIST + i]=1;	//Set the MEM_LIST page_index as used
-		// 		ValidPg=ValidPg-1;
-		// 		print i;
-		// 		print [PPFTStart + j];
-		// 		//copy the content of the parent page_index to the child page_index
-		// 		k=0;
-		// 		while(k<512) do
-		// 		 	[512*i + k]=[512*[PPFTStart + j] + k];
-		// 		 	k=k+1;	
-		// 		endwhile;
-		// 		//Set the entry of page_index in childs page_index table
-		// 		[PTBR + 32*PCB_index + j + 0]=i; //As childs PID = PCBindex
-		// 		[PTBR + 32*PCB_index + j + 1]=[PPFTStart + j + 1];
-		// 		j=j+1;
-		// 	endif;
-		// 	i=i+1;
-		// endwhile;
-
-
-	[Physical_SP -2]=0;
-	ireturn;
 	endif;

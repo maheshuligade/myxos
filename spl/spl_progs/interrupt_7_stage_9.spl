@@ -11,7 +11,7 @@ alias Physical_SP S0;
 Physical_SP=(([PTBR + 2*(SP/512)]*512) + (SP%512));
 alias SysCallNo S1;
 SysCallNo=[Physical_SP - 1];
-print SysCallNo;
+//print SysCallNo;
 if (SysCallNo==10) then
 	//Step 1
 	//If there is no process with ready state then halt the system
@@ -57,7 +57,7 @@ if (SysCallNo==10) then
 	while(fileDescriptor < 8) do
 		//Check SWOFT validity
 		if ([PPFTIStart + 2*fileDescriptor + 0]==-1) then
-			print "Invalid SWOFTI";
+			//print "Invalid SWOFTI";
 			fileDescriptor = fileDescriptor + 1;
 			continue;
 		else

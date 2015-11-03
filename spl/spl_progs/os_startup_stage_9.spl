@@ -132,4 +132,7 @@ endwhile;
 [READY_LIST + 13] =R6;
 [READY_LIST + 14] =R7;
 
+//Set the parent PID at 31 postion in the PCB
+[READY_LIST + 31]=0;
+
 ireturn;
