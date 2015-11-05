@@ -37,15 +37,29 @@ if (SysCallNo==9) then
 	//Fetch the Basic block of the file into the SCRATCHPAD
 	//This is to find the data blocks of the corresponding file,
 	//which will be the code blocks of the program
+	//if basic block is not valid return -1
+	if ([FAT + 8*FAT_Index + 2]==-1) then
+		print "Invalid Basic Block";
+		[Physical_SP -2]=-1;
+		ireturn;
+	endif;
 	load(1,[FAT + 8*FAT_Index + 2]);
 	
 	alias New_pros_pages S4;
 	New_pros_pages=0;
 	while([SCRATCHPAD + New_pros_pages]!=-1) do
-		print [SCRATCHPAD + New_pros_pages];
+		if ([SCRATCHPAD + New_pros_pages]=="") then
+			break;					
+		endif;
+		//print [SCRATCHPAD + New_pros_pages];
 		New_pros_pages=New_pros_pages+1;
 	endwhile;
 
+	if (New_pros_pages > 3) then
+		[Physical_SP -2]=-1;
+		ireturn;
+	
+	endif;
 	//Step 3 
 	//Step 4
 	alias Current_PID S5;
@@ -77,9 +91,11 @@ if (SysCallNo==9) then
 	if (Current_pros_pages==New_pros_pages) then
 		i=0;
 		while(i<3) do
-			load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
-			[Current_PTBR + 2*i + 1]="01";
-			[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+			if([SCRATCHPAD + i]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;				
+			endif;
 			i=i+1;
 		endwhile;	
 	endif;
@@ -88,9 +104,11 @@ if (SysCallNo==9) then
 		//Deallocate extra pages in the MEM_LIST
 		i=0;
 		while(i < New_pros_pages) do
-			load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
-			[Current_PTBR + 2*i + 1]="01";
-			[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+			if([SCRATCHPAD + i]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+			endif;
 			i=i+1;
 		endwhile;	
 		while(i < Current_pros_pages) do	
@@ -101,17 +119,19 @@ if (SysCallNo==9) then
 		endwhile;
 	endif;
 
-	
+	//print New_pros_pages;
 	if (Current_pros_pages < New_pros_pages) then
 		
 		i=25;
+		Free_Pages=0;
 		while(i<64) do
 			if ([MEM_LIST + i]==0) then
 				Free_Pages=Free_Pages + 1;
 			endif;		
 			i=i+1;
 		endwhile;
-		
+		print "Free_Pages";
+		print Free_Pages;
 		if (Free_Pages < New_pros_pages) then
 			print "Insufficient Memory";
 			[Physical_SP - 2]=-1;
@@ -122,11 +142,14 @@ if (SysCallNo==9) then
 		i=0;
 		Used_pages=0;
 		while(i<Current_pros_pages) do
-			load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
-			[Current_PTBR + 2*i + 1]="01";
-			[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+			if([Current_PTBR +2*i + 0]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+				Used_pages=Used_pages+1;
+			endif;
 			i=i+1;
-			Used_pages=Used_pages + 1;
+			//Used_pages=Used_pages + 1;
 		endwhile;
 		while(Used_pages<New_pros_pages) do
 			if ([MEM_LIST + i]==0) then
@@ -166,10 +189,10 @@ if (SysCallNo==9) then
 				//print "File already closed";
 				fileDescriptor=fileDescriptor + 1;
 				continue;
-		endif;
+			endif;
 		//File open validity is checked
 			print "FileOpenCount";
-			print  [FILE_TABLE +2*SWOFTI + 1];
+		//	print  [FILE_TABLE +2*SWOFTI + 1];
 
 
 			//Decrese the file open count
@@ -180,11 +203,11 @@ if (SysCallNo==9) then
 
 				//Set the entry of the FAT index in the SWOFT to invalid
 				[FILE_TABLE + 2*SWOFTI + 0]=-1; 
-
+			endif;
 				//Invalidate PPFT entry
 				[PPFTIStart + 2*fileDescriptor + 0]=-1;
 				[PPFTIStart + 2*fileDescriptor + 1]=-1;            
-			endif;
+			//endif;
 		endif;
 		fileDescriptor = fileDescriptor + 1;
 	endwhile;
@@ -226,7 +249,7 @@ if (SysCallNo==12) then
 	//Return Value:-1 (Failure) or PID of the parent process which invoked the system call (Success).
 	alias Current_PID S2;
  	Current_PID =(PTBR - 1024)/8;
- 	[Physical_SP - 2]=Current_PID;
+ 	//[Physical_SP - 2]=Current_PID;
 
 	alias Parent_PID S3;
 	Parent_PID=[READY_LIST + 32*Current_PID + 31];

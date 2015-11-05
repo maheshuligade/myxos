@@ -1,0 +1,255 @@
+alias Physical_SP S0;
+Physical_SP=(([PTBR + 2*(SP/512)]*512) + (SP%512));
+alias SysCallNo S1;
+SysCallNo=[Physical_SP - 1];
+//print SysCallNo;
+if (SysCallNo==10) then
+	//Exit System Call
+	//Description : Terminates the execution of the process which invoked it.
+	//				Exit removes this process from the Memory.There is only one process 
+	//				it halts the system.
+	//System Call No: 10
+	//Interrupt No: 9
+	//Arguments: None
+	//Return Value:-1 on failure,exits on success
+	alias Current_PID S2;
+	Current_PID = (PTBR - 1024)/8;
+
+	alias j S3;
+	j=0;
+	while(j< 32) do
+		if ([READY_LIST + 32*j + 1]==100 + Current_PID) then
+			print "PID changed";
+			[READY_LIST + 32*j + 1]=1;
+		endif;		
+		j=j+1;
+	endwhile;
+
+	//Step 1
+	//If there is no process with ready state then halt the system
+	alias PCB_index S4;
+	PCB_index=(PTBR - 1024)/8;
+	alias NO_of_Ready_Pro S3;
+	NO_of_Ready_Pro=0;
+	while(PCB_index < 32) do
+		// print "*****";
+		// print [READY_LIST + 32*PCB_index + 1];
+		// print "*****";
+		if ([READY_LIST + 32*PCB_index + 1]==1) then
+			NO_of_Ready_Pro=NO_of_Ready_Pro + 1;
+			//print "hello";
+			break;	
+		endif;
+		PCB_index=PCB_index + 1;
+	endwhile;
+	if (NO_of_Ready_Pro==0) then
+		print "No Ready Process";
+		halt;
+	endif;
+	//print "Out of the loop";
+	//Step 2
+	//Find the PCB of the current process
+	
+	alias Current_PCB S5;
+	Current_PCB = READY_LIST + 32*Current_PID;
+//	print [Current_PCB + 1];
+
+	//Traverse through the READY_LIST of PCB to find the process with STATE as running
+	PCB_index=0;	
+	while(PCB_index < 32) do
+		if ([READY_LIST + 32*PCB_index + 1]==2) then
+			break;	
+		endif;
+		PCB_index=PCB_index + 1;
+	endwhile;
+
+	//Close all open instances of the files by the process as done in the Close System Call
+	alias PPFTIStart S6;
+	PPFTIStart=READY_LIST + 32*Current_PID +15;
+
+	alias fileDescriptor S7;
+	fileDescriptor = 0;
+
+	while(fileDescriptor < 8) do
+		//Check SWOFT validity
+		if ([PPFTIStart + 2*fileDescriptor + 0]==-1) then
+			//print "Invalid SWOFTI";
+			fileDescriptor = fileDescriptor + 1;
+			continue;
+		else
+			//Index into the SWOFT
+			alias SWOFTI S8;
+			SWOFTI=[PPFTIStart + 2*fileDescriptor];
+			//Check file is open or not stage 8
+			// if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+			// 	print "File already closed";
+			// 	fileDescriptor=fileDescriptor + 1;
+			// 	continue;
+			// endif;
+			//File open validity is checked
+			print "FileOpenCount";
+			//print  [FILE_TABLE +2*SWOFTI + 1];
+
+
+			//Decrese the file open count
+			[FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] - 1;
+
+			//Check the file open count is zero
+			if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+
+				//Set the entry of the FAT index in the SWOFT to invalid
+				[FILE_TABLE + 2*SWOFTI + 0]=-1; 
+
+				//Invalidate PPFT entry
+				[PPFTIStart + 2*fileDescriptor + 0]=-1;
+				[PPFTIStart + 2*fileDescriptor + 1]=-1;            
+			endif;
+		endif;
+		fileDescriptor = fileDescriptor + 1;
+	endwhile;
+	
+	//Set the  STATE in the PCB to 0. This indicates that the process has terminated. 
+	[Current_PCB + 1]=0;	
+	fileDescriptor=0;
+	while(fileDescriptor < 8) do
+		//The entries of the of the pages in the MEM_LIST must be decremented to 0,indicating unused.
+		//This is done by checking the PPFT of the process.
+		if ([PPFTIStart + 2*fileDescriptor + 0]!=-1) then
+			
+			[MEM_LIST + [PPFTIStart + 2*fileDescriptor + 0]]=0;
+		endif;
+		//Invalidate the all entries in the  PPFT of the process
+		//To do this set the address field to -1 and the auxiliary information to 00
+		//This indicates that the page table entry is not referenced and invalid
+
+		[PPFTIStart + 2*fileDescriptor + 0]=-1;
+		[PPFTIStart + 2*fileDescriptor + 1]="00";
+		fileDescriptor = fileDescriptor + 1; 
+	endwhile;
+	//Find the next ready process from the READY_LIST of the PCBs
+	PCB_index=0;
+	while(PCB_index < 32) do
+	
+		//print [READY_LIST + 32*PCB_index + 1];
+		if ([READY_LIST + 32*PCB_index + 1]==1) then
+			break;	
+		endif;
+		PCB_index=PCB_index + 1;
+	endwhile;
+
+
+	//Schedule this process for the execution by loading in the registers from the PCB
+
+	alias newPCB S9;
+
+	newPCB = READY_LIST +32*PCB_index;
+
+
+	BP=[newPCB + 2];
+	SP=[newPCB + 3];
+	PTBR=[newPCB + 5];
+	PTLR=[newPCB + 6];
+	R0=[newPCB + 7];
+	R1=[newPCB + 8];
+	R2=[newPCB + 9];
+	R3=[newPCB + 10];
+	R4=[newPCB + 11];
+	R5=[newPCB + 12];
+	R6=[newPCB + 13];
+	R7=[newPCB + 14];
+	SP=SP + 1;
+
+	
+	//Get the IP from the PCB and store it on the  top of the stack
+	alias newPhysical_SP S10;
+	newPhysical_SP = (([PTBR + 2*(SP/512)] *512 )+(SP % 512));    //calculate the physical address of the SP
+	[newPhysical_SP] = [newPCB + 4];							  //STORE IP field of the PCB on the  STACK
+
+
+	//[newPCB + 1]=0; //set STATE to RUNNING;
+
+	[newPCB + 1]=2; //set STATE to RUNNING;
+
+	//Search all PCB with State 100 + ProccessID and change it to 100 + processID
+	// alias j S11;
+	// j=0;
+	// while(j< 32) do
+	// 	if ([READY_LIST + 32*j + 1]==100 + Current_PID) then
+	// 		print "PID changed";
+	// 		[READY_LIST + 32*j + 1]=1;
+	// 	endif;		
+	// 	j=j+1;
+	// endwhile;
+	[Physical_SP -2]=0;
+	ireturn;
+	
+endif;
+if (SysCallNo==13) then
+	//Wait System Call
+	//Description:	The current process is blocked till the process with given 
+	//				PID given as argument executes a Signal system call or exits.
+	//System Call No: 7
+	//Interrupt Routine No: 7
+	//Arguments:ProcessID
+	//Return Value: -1(Failure) or 0 (success)
+	alias waitingPID S2;
+    waitingPID=[Physical_SP - 3];
+
+    //If the waitingPID is Current_PID then return -1
+    alias Current_PID S3;
+    Current_PID=(PTBR - 1024)/8;
+    if (Current_PID==waitingPID) then
+   // 	print "waiting for Current_PID";
+    	[Physical_SP - 2]=-1;
+    	ireturn;
+    endif;
+
+    //Check the waitingPID process is terminated if it is terminated then return -1;
+    alias waitingPID_State S4;
+    waitingPID_State=[READY_LIST + 32*waitingPID + 1];
+   // print waitingPID_State;
+    if (waitingPID_State==0) then
+    //	print "waiting for terminated process";
+    	[Physical_SP - 2]=-1;
+    	ireturn;    
+    endif;
+    //Change the PID of the given process to 100 + waitingPID, as it is waiting for 
+    //the process with given PID
+   // print [READY_LIST + 32*Current_PID + 1];
+    [READY_LIST + 32*Current_PID + 1]=100 + waitingPID;
+   // print [READY_LIST + 32*Current_PID + 1]; 
+
+    //Return from the system call with 1
+    [Physical_SP - 2]=0;
+    ireturn;
+endif;
+
+if (SysCallNo==14) then
+	//print SysCallNo;
+	//print "Signal SysCall";
+	//Signal System Call
+	//Description: All processes waiting for the current process are resumed.
+	//System Call No:14
+	//Interrupt Routine No:7
+	//Arguments:None
+	//Return Value: -1 (Failure) or 0 (Success)
+	
+	//Search all PCB with State 100 + ProccessID and change it to 1
+	alias Current_PID S2;
+	Current_PID=(PTBR - 1024)/8;
+
+	alias j S3;
+	j=0;
+	while(j< 32) do
+		if ([READY_LIST + 32*j + 1]==100 + Current_PID) then
+			print "PID changed";
+			[READY_LIST + 32*j + 1]=1;
+		endif;		
+		j=j+1;
+	endwhile;
+	[Physical_SP - 2]=0;
+	ireturn;
+endif;
+
+[Physical_SP - 2]=-1;
+ireturn;
