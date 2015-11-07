@@ -14,8 +14,11 @@ if (SysCallNo==10) then
 	//Return Value:-1 on failure,exits on success
 	alias Current_PID S2;
 	Current_PID = (PTBR - 1024)/8;
+	alias Current_PCB S3;
+	Current_PCB = READY_LIST + 32*Current_PID;
+	[Current_PCB + 1]=0;
 
-	alias j S3;
+	alias j S4;
 	j=0;
 	while(j< 32) do
 		if ([READY_LIST + 32*j + 1]==100 + Current_PID) then
@@ -27,9 +30,9 @@ if (SysCallNo==10) then
 
 	//Step 1
 	//If there is no process with ready state then halt the system
-	alias PCB_index S4;
+	alias PCB_index S5;
 	PCB_index=(PTBR - 1024)/8;
-	alias NO_of_Ready_Pro S3;
+	alias NO_of_Ready_Pro S6;
 	NO_of_Ready_Pro=0;
 	while(PCB_index < 32) do
 		// print "*****";
@@ -50,24 +53,35 @@ if (SysCallNo==10) then
 	//Step 2
 	//Find the PCB of the current process
 	
-	alias Current_PCB S5;
-	Current_PCB = READY_LIST + 32*Current_PID;
+	
 //	print [Current_PCB + 1];
 
-	//Traverse through the READY_LIST of PCB to find the process with STATE as running
-	PCB_index=0;	
-	while(PCB_index < 32) do
-		if ([READY_LIST + 32*PCB_index + 1]==2) then
+	// //Traverse through the READY_LIST of PCB to find the process with STATE as running
+	// PCB_index=0;	
+	// while(PCB_index < 32) do
+	// 	if ([READY_LIST + 32*PCB_index + 1]==2) then
+	// 		break;	
+	// 	endif;
+	// 	PCB_index=PCB_index + 1;
+	// endwhile;
+	//Find the next ready process from the READY_LIST of the PCBs
+	alias newProID S7;
+	newProID=0;
+	while(newProID < 32) do
+	
+		//print [READY_LIST + 32*PCB_index + 1];
+		if ([READY_LIST + 32*newProID + 1]==1) then
 			break;	
 		endif;
-		PCB_index=PCB_index + 1;
+		newProID=newProID + 1;
 	endwhile;
 
+
 	//Close all open instances of the files by the process as done in the Close System Call
-	alias PPFTIStart S6;
+	alias PPFTIStart S8;
 	PPFTIStart=READY_LIST + 32*Current_PID +15;
 
-	alias fileDescriptor S7;
+	alias fileDescriptor S9;
 	fileDescriptor = 0;
 
 	while(fileDescriptor < 8) do
@@ -78,7 +92,7 @@ if (SysCallNo==10) then
 			continue;
 		else
 			//Index into the SWOFT
-			alias SWOFTI S8;
+			alias SWOFTI S10;
 			SWOFTI=[PPFTIStart + 2*fileDescriptor];
 			//Check file is open or not stage 8
 			// if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
@@ -110,39 +124,30 @@ if (SysCallNo==10) then
 	
 	//Set the  STATE in the PCB to 0. This indicates that the process has terminated. 
 	[Current_PCB + 1]=0;	
-	fileDescriptor=0;
-	while(fileDescriptor < 8) do
+	alias Page_Index S11;
+	Page_Index=0;
+	while(Page_Index < 4) do
 		//The entries of the of the pages in the MEM_LIST must be decremented to 0,indicating unused.
 		//This is done by checking the PPFT of the process.
-		if ([PPFTIStart + 2*fileDescriptor + 0]!=-1) then
+		if ([PTBR + 2*Page_Index + 0]!=-1) then
 			
-			[MEM_LIST + [PPFTIStart + 2*fileDescriptor + 0]]=0;
+			[MEM_LIST + [PTBR+ 2*Page_Index + 0]]=0;
 		endif;
 		//Invalidate the all entries in the  PPFT of the process
 		//To do this set the address field to -1 and the auxiliary information to 00
 		//This indicates that the page table entry is not referenced and invalid
 
-		[PPFTIStart + 2*fileDescriptor + 0]=-1;
-		[PPFTIStart + 2*fileDescriptor + 1]="00";
-		fileDescriptor = fileDescriptor + 1; 
-	endwhile;
-	//Find the next ready process from the READY_LIST of the PCBs
-	PCB_index=0;
-	while(PCB_index < 32) do
-	
-		//print [READY_LIST + 32*PCB_index + 1];
-		if ([READY_LIST + 32*PCB_index + 1]==1) then
-			break;	
-		endif;
-		PCB_index=PCB_index + 1;
+		[PTBR + 2*Page_Index + 0]=-1;
+		[PTBR + 2*Page_Index + 1]="00";
+		Page_Index = Page_Index + 1; 
 	endwhile;
 
 
 	//Schedule this process for the execution by loading in the registers from the PCB
 
-	alias newPCB S9;
+	alias newPCB S12;
 
-	newPCB = READY_LIST +32*PCB_index;
+	newPCB = READY_LIST +32*newProID;
 
 
 	BP=[newPCB + 2];
@@ -161,7 +166,7 @@ if (SysCallNo==10) then
 
 	
 	//Get the IP from the PCB and store it on the  top of the stack
-	alias newPhysical_SP S10;
+	alias newPhysical_SP S13;
 	newPhysical_SP = (([PTBR + 2*(SP/512)] *512 )+(SP % 512));    //calculate the physical address of the SP
 	[newPhysical_SP] = [newPCB + 4];							  //STORE IP field of the PCB on the  STACK
 

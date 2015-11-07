@@ -19,17 +19,17 @@ if (SysCallNo==8) then
 
 	//Step 2
 	//Store the PCB_index of the free PCB into the register
-	alias PCB_index S2;
-	PCB_index=0;
-	while(PCB_index < 32) do
-		if ([READY_LIST + 32*PCB_index + 1]==0) then
+	alias Child_PID S2;
+	Child_PID=0;
+	while(Child_PID < 32) do
+		if ([READY_LIST + 32*Child_PID + 1]==0) then
 			//print "Free PCB found";
 			break;
 		endif;
-		PCB_index=PCB_index+1;
+		Child_PID=Child_PID+1;
 	endwhile;
 
-	if (PCB_index==32) then
+	if (Child_PID==32) then
 		print "No free PCB";
 		[Physical_SP - 2]=-1;
 		ireturn;
@@ -38,7 +38,7 @@ if (SysCallNo==8) then
 	//Step 3
 	//Set the PID value of the child process with the value obtained in step 2
 	//print PCB_index;
-	[READY_LIST + 32*PCB_index + 0]=PCB_index;
+	[READY_LIST + 32*Child_PID + 0]=Child_PID;
 
 	//Step 4
 	//Count the page_index in the PPFT of the parent process
@@ -48,7 +48,7 @@ if (SysCallNo==8) then
 	alias Child_PTBR S5;
 
 	Parent_PTBR= PAGE_TABLE + 8*Parent_PID;
-	Child_PTBR=PAGE_TABLE + 8*PCB_index; //AS PCB_index=Child_PID
+	Child_PTBR=PAGE_TABLE + 8*Child_PID; //AS PCB_index=Child_PID
 
 	alias page_index S6;
 	page_index=0;
@@ -56,17 +56,18 @@ if (SysCallNo==8) then
 	breakpoint;
 	MEM_LIST_ENTRY=25;
 	while(page_index < 4) do
-		if ([Parent_PTBR + page_index]!=-1) then
+		if ([Parent_PTBR + 2*page_index + 0]!=-1) then
 			while(MEM_LIST_ENTRY < 64) do
 					
 				if ([MEM_LIST + MEM_LIST_ENTRY]==0) then
 					//Set the MEM_LIST_ENTRY as used
-					[MEM_LIST + MEM_LIST_ENTRY]=1;
+					//[MEM_LIST + MEM_LIST_ENTRY]=1;
 					//print [Parent_PTBR + 2*page_index + 0];
 					//print [Parent_PTBR + 2*page_index + 1];
 					//Set the child page entry
 					[Child_PTBR + 2*page_index + 0]=MEM_LIST_ENTRY; //[Parent_PTBR + 2*page_index + 0];
 					[Child_PTBR + 2*page_index + 1]=[Parent_PTBR + 2*page_index + 1];
+					MEM_LIST_ENTRY=MEM_LIST_ENTRY+1;
 					break;
 				endif;
 				MEM_LIST_ENTRY=MEM_LIST_ENTRY + 1;
@@ -79,7 +80,7 @@ if (SysCallNo==8) then
 			endif;
 		else
 			[Child_PTBR + 2*page_index + 0]=-1;
-			[Child_PTBR + 2*page_index + 1]=[Parent_PTBR + page_index]; 
+			[Child_PTBR + 2*page_index + 1]=[Parent_PTBR + page_index + 1]; 
 		endif;
 
 		page_index=page_index+1;
@@ -91,17 +92,20 @@ if (SysCallNo==8) then
 	page_index=0;
 	while(page_index < 4) do
 		//Copy the content of the Parent pages to the Child pages
-		i=0;
-		while(i<512) do
-			[512*[Child_PTBR + 2*page_index + 0] + i]=[512*[Parent_PTBR + 2*page_index + 0] + i];
-			i=i+1;
-		endwhile;
+		if([Child_PTBR + 2*page_index + 0]!=-1) then
+			[MEM_LIST + [Child_PTBR + 2*page_index + 0]]=1;
+			i=0;
+			while(i<512) do
+				[512*[Child_PTBR + 2*page_index + 0] + i]=[512*[Parent_PTBR + 2*page_index + 0] + i];
+				i=i+1;
+			endwhile;
+		endif;
 		page_index=page_index+1;
 	endwhile;
 		
 	//Calculate the  Child process PCB
 	alias PCB_Child S10;
-	PCB_Child=READY_LIST + 32*PCB_index; //PCB_Child=READY_LIST + 32*Child_PID;
+	PCB_Child=READY_LIST + 32*Child_PID; //PCB_Child=READY_LIST + 32*Child_PID;
 	alias PCB_Parent S11;
 	PCB_Parent=READY_LIST + 32*Parent_PID;
 
@@ -109,7 +113,7 @@ if (SysCallNo==8) then
 	//Set the PTBR field in the child process calculated in the previous steps;
 	[PCB_Child + 5]=Child_PTBR;
 
-	[PCB_Child + 6] = 4;//Set PTLR
+	[PCB_Child + 6] = [PCB_Parent + 6];//Set PTLR
 	//Step 6
 	//Set the IP field in the child process
 	[PCB_Child + 4]=[Physical_SP];
@@ -132,7 +136,9 @@ if (SysCallNo==8) then
 	[PCB_Child + 12]=R5;
 	[PCB_Child + 13]=R6;
 	[PCB_Child + 14]=R7;
-		
+	//Set the parent PID at the 31 location of the child PCB
+	[PCB_Child + 31]=Parent_PID;
+
 	//Step 9
 	//Copy the per process file table from the Parent process to Child process
 	i=0;
@@ -154,7 +160,7 @@ if (SysCallNo==8) then
 
 	//Step 11
 	//Set the PID of the child as obtained in the step 2 to the Physical_SP-2
-	[Physical_SP-2]=PCB_index;
+	[Physical_SP-2]=Child_PID;
 	breakpoint;
 	//Step 12
 	//The value -2 is stored in the childs stack space return to th Physical_SP-1
@@ -168,7 +174,5 @@ if (SysCallNo==8) then
 	//Step 13
 	//Control is passed to the parent process
 	breakpoint;
-	//Set the parent PID at the 31 location of the child PCB
-	[PCB_Child + 31]=Parent_PID;
 	ireturn;
 endif;

@@ -1,13 +1,17 @@
 integer main()
 {	
-	integer PID,a;	
-	// PID=Getpid();
-	// print(PID);
-	// PID=Getppid();
-	// print(PID);
-	a=Wait(3);
-	print(a);
+	integer PID,a,parentPID;	
+	//PID=Getpid();
+	//print(PID);
+	//PID=Fork();
+	//PID=Fork();
+	// parentPID=Getppid();
+	// print(parentPID);
+	// a=Wait(1);
+	// print(a);
 	a=Signal();
 	print(a);
+	// a=Signal();
+	// print(a);
 	return 0;
 }
