@@ -48,7 +48,7 @@ if (SysCallNo==9) then
 	alias New_pros_pages S4;
 	New_pros_pages=0;
 	while([SCRATCHPAD + New_pros_pages]!=-1) do
-		if ([SCRATCHPAD + New_pros_pages]=="") then
+		if ([SCRATCHPAD + New_pros_pages]==""||[SCRATCHPAD + New_pros_pages]==-1) then
 			break;					
 		endif;
 		//print [SCRATCHPAD + New_pros_pages];
@@ -185,13 +185,13 @@ if (SysCallNo==9) then
 			alias SWOFTI S14;
 			SWOFTI=[PPFTIStart + 2*fileDescriptor];
 			//Check file is open or not stage 8
-			if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
-				//print "File already closed";
-				fileDescriptor=fileDescriptor + 1;
-				continue;
-			endif;
+			// if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+			// 	//print "File already closed";
+			// 	fileDescriptor=fileDescriptor + 1;
+			// 	continue;
+			// endif;
 		//File open validity is checked
-			print "FileOpenCount";
+			//print "FileOpenCount";
 		//	print  [FILE_TABLE +2*SWOFTI + 1];
 
 
