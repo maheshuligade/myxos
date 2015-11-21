@@ -77,11 +77,21 @@ if (SysCallNo==8) then
 		//alias j S12;
 			j=0;
 			while(j < 32) do
+				// if (j>32) then	
+				// 	j=0;
+				// endif;
+				j=(j+1)%32;
+				Process_PTBR=PAGE_TABLE + 8*j;	
 				VictimPage=Process_PTBR;
 				while (VictimPage < Process_PTBR + 6) do
 					//print [VictimPage + 1];
 					//print "*****";
 					//print [MEM_LIST + [VictimPage]];
+					if ([DISK_LIST + [VictimPage]]>1) then
+						
+						VictimPage=VictimPage+2;
+						continue;
+					endif;
 					if ([VictimPage + 1]=="01") then
 						j=32;
 						break;
@@ -94,12 +104,11 @@ if (SysCallNo==8) then
 						[VictimPage + 1 ]="01";
 						// print "*****";
 						// print [VictimPage];
-						continue;
+						//continue;
 					endif;			
 					VictimPage=VictimPage+2;
 				endwhile;
-				j=j+1;
-				Process_PTBR=Process_PTBR + 8;			
+						
 			endwhile;
 
 		SWAP_Block=448;
@@ -131,7 +140,7 @@ if (SysCallNo==8) then
 		// ireturn;				
 	endif;
 	//Update the MEM_LIST 
-	//[MEM_LIST + MEM_LIST_ENTRY]= 1;
+	[MEM_LIST + MEM_LIST_ENTRY]= 1;
 	//Allocate this free page for the stack of the  child process
 	[Child_PTBR + 2*3 + 0]=MEM_LIST_ENTRY;
 	//Copy the stack page of the parent process to the stack page of the child process word by word
