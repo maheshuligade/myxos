@@ -1,0 +1,66 @@
+load(7,1); 
+load(8,2);
+load(23,17);
+load(24,18);
+[READY_LIST + 0]=0; //set the entry of PID 0;
+
+load(25,21);
+load(26,22);
+load(27,23);
+PTBR=1024 + 8*0 ;   //PTBR=1024 +8*PID;
+PTLR=4;
+
+[PTBR + 0]=25;
+[PTBR + 1]="01";
+[PTBR + 2]=26;
+[PTBR + 3]="01";
+[PTBR + 4]=27;
+[PTBR + 5]="01";	
+[PTBR + 6]=28;
+[PTBR + 7]="01";
+[READY_LIST + 1]=2;
+SP=3*512;
+[28*512]=0;
+breakpoint;
+load(11,5);
+load(12,6);
+load(9,3);
+load(10,4);
+
+[READY_LIST + 32] =1;//set the entry for pid 1
+load(29,27);
+alias PTBR_Process1 S0;
+
+PTBR_Process1=1024 + 1*8; 		//startig address of the page table=1024 + pid*8
+[PTBR_Process1 + 0]=29; 		//Physical Page number for logical page 0
+[PTBR_Process1 + 1]="01"; 		//not reffrenced and valid
+[PTBR_Process1 + 2]=-1;			//Invalid page number for logical page 1
+[PTBR_Process1 + 3]="00";		// not reffrenced and  not valid
+[PTBR_Process1 + 4]=-1;			//Invalid page number for logical page 2
+[PTBR_Process1 + 5]="00";		// not reffrenced and  not valid
+[PTBR_Process1 + 6]=30 ;		//Physical page number for load page 3
+[PTBR_Process1 + 7]="01"; 		//not reffrenced and valid
+
+//alias PTBR_Process2 S0;
+//PTBR_Process2=1024 + 2*8; 		//startig address of the page table=1024 + pid*8
+//[PTBR_Process2 + 0]=31; 		//Physical Page number for logical page 0
+//[PTBR_Process2 + 1]="01"; 		//not reffrenced and valid
+//[PTBR_Process2 + 2]=-1;			//Invalid page number for logical page 1
+//[PTBR_Process2 + 3]="00";		// not reffrenced and  not valid
+//[PTBR_Process2 + 4]=-1;			//Invalid page number for logical page 2
+//[PTBR_Process2 + 5]="00";		// not reffrenced and  not valid
+//[PTBR_Process2 + 6]=32 ;		//Physical page number for load page 3
+//[PTBR_Process2 + 7]="01"; 		//not reffrenced and valid
+
+[READY_LIST + 33]=1;			 //state is ready;
+[READY_LIST + 37]=PTBR_Process1; //PTBR 
+[READY_LIST + 38]=4; 		    //PTLR
+[READY_LIST + 34]=3*512; 	    //set the entry for BP in the PCB;
+[READY_LIST + 35]=3*512; 		//sets the entry for SP in the PCB
+[READY_LIST + 36]=0; 			//sets the entry for IP to logical address 0 in the PCB
+//load(9,3);
+//load(10,4);
+
+
+print "OS Startup ended";
+ ireturn;

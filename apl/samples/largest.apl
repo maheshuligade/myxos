@@ -1,6 +1,7 @@
 decl
 	integer a,b,c,d;
 enddecl
+
 integer main(){
 	read(a);
 	read(b);
@@ -11,29 +12,29 @@ integer main(){
 			if(a>d) then 
 				print(a);
 			else	
-				print(d); 
+				print(d);
 			endif;
 		else 
 			if(c>d) then 
-			     print(c);
-		     	else 
-		     		print(d); 
+			    print(c);
+		    else 
+		     	print(d); 
 		     	endif;
-		endif;
-	else
-		if(b>c) then 
+		endif; 
+	else 
+		if(b>c) then  
 			if(b>d) then 
 				print(b);
 			else 
 				print(d); 
 			endif;
 		else
-			if(c>d) then 
+    		if(c>d) then 
 				print(c);
-		    	else
+		    else 
 		    		print(d);
 		    	endif; 
-		endif;		
-	endif;
+		endif; 
+	endif; 
 	return 0;
 }
