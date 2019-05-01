@@ -1,0 +1,149 @@
+alias Physical_SP S0;
+Physical_SP=([PTBR + 2*(SP/512)]*512)+(SP%512);  //Get the sytem call no from stack and put it
+                                                 // in the register
+//Get arguments from the stack and put it in the register
+
+alias SysCallNo S1;
+
+SysCallNo=[Physical_SP -1];
+print "SysCallNo=";
+print SysCallNo;
+
+breakpoint;
+
+if (SysCallNo==1) then
+   //Implementation of Create();,Interrupt NO. 1,
+   //arguments:filename,Return value=-1(failure),0(success);
+    ////////////////////////////////////////////////////////////////////////
+    /////////////////////////////|FAT|//////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
+    ////|    0      |   1       |        2               | 3 - 7       |////
+    ////| File Name | File Size | Block# of Basic Block  |...Unused... |////
+    ////////////////////////////////////////////////////////////////////////
+    alias File_name S2;
+    File_name=[Physical_SP - 3];
+    print "filename";
+    print File_name;
+
+    alias current_File S3;
+    current_File= FAT;
+
+    //Checking if filename already exits.
+
+    while(current_File < (FAT + 512)) do
+         
+         if ([current_File + 0]==File_name) then
+            [Physical_SP - 2]=-1;      
+            print "File exits";
+            ireturn;
+
+           endif;   
+        current_File=current_File + 8;
+    endwhile;
+    print "Creating File";
+
+    alias free_block S3;
+    free_block=24;
+
+   
+    //Checking free_block  in the DISK_LIST;
+
+    while(free_block < 447) do
+          
+      if ([free_block + DISK_LIST]==0) then
+          print "found free space";    
+          print free_block;
+          break;
+      endif;   
+      free_block=free_block+1;
+    endwhile;
+
+    //If no free Block found; 
+    if (free_block==447) then
+          print "No free_block"; 
+          [Physical_SP -2 ]=-1;
+          ireturn;     
+    endif;
+
+
+    alias FreeFatLoc S4;
+    FreeFatLoc=FAT;
+  
+    while(FreeFatLoc < FAT + 512) do
+        print [FreeFatLoc];
+        if ([FreeFatLoc + 2]==-1) then
+        
+            print "FatBlockExits";
+            break;
+              
+        endif;    
+      
+        FreeFatLoc=FreeFatLoc+8;
+    endwhile;
+   
+   //No fat Space present
+    if (FreeFatLoc==FAT + 512) then
+
+        print "No FAT block";
+        [Physical_SP -2 ]=-1;
+        ireturn; 
+
+    endif;
+
+    print "free fat_loc=";
+    print FreeFatLoc;  
+ 
+   [FreeFatLoc + 0]=File_name;
+   [FreeFatLoc + 1]=0;
+   [FreeFatLoc + 2]=free_block;
+
+   load(1,free_block);
+
+   alias i S5;
+   i=0;
+   while(i < 256) do
+         
+     [SCRATCHPAD + i]=-1;
+     i=i+1;
+     
+   endwhile;
+
+   store(1,free_block);
+
+   
+   [DISK_LIST + free_block]=1;
+   [Physical_SP - 2]=0;
+   
+  //store copies of the Disk Free List and the FAT entries from memory to the Disk
+  store(5,19);
+  store(6,20);
+  ireturn;
+
+
+
+
+
+
+
+
+	
+endif;
+
+//if (SysCallNo==2) then
+   //Implementation of Open();,Interrupt NO. 2,arguments:filename,;
+   //Return value=Integer value called FileDescriptor,which is index of corresponding; 
+   //file entry in the Per-Process Open file table;
+ //print File_name;
+//endif;
+
+//if (SysCallNo==3) then
+    	
+ //print File_name;
+	
+//endif;
+
+//if (SysCallNo==4) then
+    	
+ //print File_name;
+	
+//endif;
