@@ -46,7 +46,7 @@ newPID = (current_PID + 1)%32;
 
 while([READY_LIST + 32*newPID +1]!=1) do
     	
-    newPID=(newPID +1 )%32;
+    newPID=(newPID +1)%32;
 endwhile;
  
 
@@ -77,8 +77,9 @@ newPhysical_SP = (([PTBR + 2*(SP /512)] *512 )+(SP % 512));    //calculate the p
 [newPhysical_SP] = [newPCB + 4];							  //STORE IP field of the PCB on the  STACK
 
 
+//[newPCB + 1]=0; //set STATE to RUNNING;
 
-[newPCB + 1]=0; //set STATE to RUNNING;
+[newPCB + 1]=2; //set STATE to RUNNING;
 
 //SP = SP -1;
 print "Timer Ended";

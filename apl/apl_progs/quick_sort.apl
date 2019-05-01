@@ -91,9 +91,9 @@ integer quicksort(integer left,right)
         //print(c);
         c=Read(FilePtrRnd,Ai);
         //print(c);
-        //c=Seek(FilePtrRnd,j);
+        c=Seek(FilePtrRnd,j);
         //print(c);
-        //c=Read(FilePtrRnd,Aj);
+        c=Read(FilePtrRnd,Aj);
         c=Seek(FilePtrRnd,i);
         //print(c);
         c=Write(FilePtrRnd,Aj);
@@ -127,6 +127,7 @@ integer quicksort(integer left,right)
     //print(count);
     //print("***********");
     pivot=i + 1;
+    //pivot=parition(left,right);
     a=quicksort(left,pivot-1);
     a=quicksort(pivot + 1,right);
    	
@@ -144,12 +145,33 @@ integer main()
     //count1=0;
     FilePtrRnd=Open("Random.dat");
     ////print(FilePtrRnd);
-    a=quicksort(0,10);
-    print("Hello");
-    // a=Seek(FilePtrRnd,0);
+    integer size;
+    string s;
+    s="a";
+    size=0;
+    a=Read(FilePtrRnd,s); 
+   //print (s);
+   while(s!="EOF") do
+       //  print ("******");
+       // print (a);
+       //  print (s);
+        a=Read(FilePtrRnd,s);
+        size =size +1;      
+   endwhile;
+  c=Close(FilePtrRnd);
+   
+    //print ("size");
+    //print (size);
+    FilePtrRnd=Open("Random.dat");
+    a=quicksort(0,size);
+    //print("Hello");
+    //print("Hello");
+    // a=Seek(FilePt  rRnd,0);
     // a=Read(FilePtrRnd,c);
     // //print(c);
     c=Close(FilePtrRnd);
+    //print("Hello");
     //print(c);
+   // print (size);
 	return 0;
 }

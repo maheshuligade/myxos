@@ -1,0 +1,135 @@
+//load exception handler
+load(7,1);  
+load(8,2);
+
+//load intrupt 7 routine
+load(23,17); 
+load(24,18); 
+breakpoint;
+//Sets the pid as 0
+[READY_LIST + 0]=0; 
+
+//load init process 
+load(25,21);
+load(26,22);
+load(27,23);
+
+//set page table base register
+PTBR=1024;
+//set page table length register
+PTLR=4;
+
+//setup page table for init process
+
+[PTBR + 0]=25;
+[PTBR + 1]="01";
+[PTBR + 2]=26;
+[PTBR + 3]="01";
+[PTBR + 4]=27;
+[PTBR + 5]="01";
+[PTBR + 6]=28;
+[PTBR + 7]="01";
+
+//set process status as running
+[READY_LIST + 32*0 + 1]=2;
+
+//set stack pointer to 3*512;
+SP=3*512;
+//set IP value of the init process as 0
+[28*512]=0;
+
+//load intrupt 1 routine from disk to memory
+load(11,5);
+load(12,6);
+//load timer intrupt from disk to memory
+load(9,3);
+load(10,4);
+//load FAT table from disk to memory
+load(5,19);
+//load disk free list from disk to memory
+load(6,20);
+//step 1
+//set containts of the system wide open file table as invalid,
+//because there is no file is open when os starts
+//an invalid entry is indicated by -1 in the FAT Index
+//The File open count set to 0 for all entries
+alias counter S0;
+counter = 0;
+
+while(counter < 128) do  //64 entries each of size 2 words
+       	 
+  [FILE_TABLE + counter + 0]=-1; //sets the  FAT index to -1
+  [FILE_TABLE + counter + 1]=0;  // sets the file open count to 0
+   counter = counter + 2;
+endwhile;
+
+//step 2
+//sets the all entries of the per process open file table as invalid
+alias i S1;
+i=15;
+while(i<31) do
+    	
+  [READY_LIST + i + 0]=-1;//sets pointer to system wide open file table entry as -1
+  [READY_LIST + i + 1]=-1;//sets the LSEEK position to -1
+  i=i+2;
+endwhile;
+
+//step 3
+//load intrupt 2 routine 
+load(13,7);
+load(14,8);
+//load intrupt 3 routine
+load(15,9);
+load(16,10);
+//load intrupt 4 routine 
+load(17,11);
+load(18,12);
+//load interupt 5 routine
+load(19,13);
+load(20,14);
+//load interupt 6 routine
+load(21,15);
+load(22,16);
+//load interupt 7 routine 
+load(23,17);
+load(24,18);
+
+//Set MEM_LIST entries from 0 to 24 as used(1) and all other as unsed(0)
+alias j S2;
+j=0;
+while(j <= 25) do    	
+	[MEM_LIST + j]=1;
+	j=j+1;
+endwhile;
+j=25;
+while(j< 64) do
+	[MEM_LIST + j]=0;
+	j=j+1;	
+endwhile;
+
+//Set all PCBs with STATE field 0
+alias k S3;
+k=1;
+//[READY_LIST + 32*0 + 1]=2;
+while(k< 32) do  	
+	[READY_LIST + 32*k + 1]=0;
+	k=k+1;
+endwhile;
+
+//Added for fork 
+[READY_LIST + 2] = BP;
+[READY_LIST + 5] = PTBR;                 //set PTBR fields of the PCB
+[READY_LIST + 6] = PTLR;              //set PTBR fields of PCB
+
+//save the Registers R0-R7 in the PCB 
+
+[READY_LIST +  7] =R0;
+[READY_LIST +  8] =R1;
+[READY_LIST +  9] =R2;
+[READY_LIST + 10] =R3;
+[READY_LIST + 11] =R4;
+[READY_LIST + 12] =R5;
+[READY_LIST + 13] =R6;
+[READY_LIST + 14] =R7;
+
+ireturn;

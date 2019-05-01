@@ -1,0 +1,243 @@
+//Fork System Call
+//Description : Replicates the process which invoked this System Call in the memory.
+//System Call No: 8
+//Interrupt No:5
+//Return Value:In the parent parent process,PID of the process created (Success) or -1 (Failure).
+//				In the child process ,-2 for success ,and if it is fails no child process is
+//				created.
+
+//Calculate the physical address of the Stack
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+alias SysCallNo S1;
+SysCallNo=[Physical_SP -1];
+print SysCallNo;
+	if (SysCallNo==8) then
+		print "Fork SysCall";
+		//Step 1
+		//Find a free PCB in the READY_LIST
+
+		//Step 2
+		//Store the PCB_index of the free PCB into the register
+		alias PCB_index S2;
+		PCB_index=0;
+		while(PCB_index < 32) do
+			if ([READY_LIST + 32*PCB_index + 1]==0) then
+				print "Free PCB found";
+				break;
+			endif;
+			PCB_index=PCB_index+1;
+		endwhile;
+
+		if (PCB_index==32) then
+			print "No free PCB";
+			[Physical_SP - 2]=-1;
+			ireturn;
+		endif;
+
+		//Step 3
+		//Set the PID value of the child process with the value obtained in step 2
+		//print PCB_index;
+		[READY_LIST + 32*PCB_index + 0]=PCB_index;
+
+		//Step 4
+		//Count the page_index in the PPFT of the parent process
+		alias Parent_PID S3;
+		Parent_PID=(PTBR - 1024)/8;
+		alias Parent_PTBR S4;
+		alias Child_PTBR S5;
+
+		Parent_PTBR= PAGE_TABLE + 8*Parent_PID;
+		Child_PTBR=PAGE_TABLE + 8*PCB_index; //AS PCB_index=Child_PID
+
+		alias page_index S6;
+		page_index=0;
+		alias MEM_LIST_ENTRY S7;
+		breakpoint;
+		MEM_LIST_ENTRY=25;
+		while(page_index < 4) do
+			if ([Parent_PTBR + page_index]!=-1) then
+				while(MEM_LIST_ENTRY < 64) do
+					
+					if ([MEM_LIST + MEM_LIST_ENTRY]==0) then
+						//Set the MEM_LIST_ENTRY as used
+						[MEM_LIST + MEM_LIST_ENTRY]=1;
+						//print [Parent_PTBR + 2*page_index + 0];
+						//print [Parent_PTBR + 2*page_index + 1];
+						//Set the child page entry
+						[Child_PTBR + 2*page_index + 0]=MEM_LIST_ENTRY; //[Parent_PTBR + 2*page_index + 0];
+						[Child_PTBR + 2*page_index + 1]=[Parent_PTBR + 2*page_index + 1];
+						break;
+					endif;
+					MEM_LIST_ENTRY=MEM_LIST_ENTRY + 1;
+				endwhile;
+				//Check if enough pages are present  in the Memory,if not return Insufficent Memory
+				if (MEM_LIST_ENTRY==64) then
+					print "Insufficent Memory";
+					[Physical_SP-2]=-1;
+					ireturn;				
+				endif;
+			else
+				[Child_PTBR + 2*page_index + 0]=-1;
+				[Child_PTBR + 2*page_index + 1]=[Parent_PTBR + page_index]; 
+			endif;
+
+			page_index=page_index+1;
+		endwhile;
+
+		//For each valid pages of the parent process the contents needs to be 
+		//copied in the childs pages
+		alias i S9;
+		page_index=0;
+		while(page_index < 4) do
+			//Copy the content of the Parent pages to the Child pages
+			i=0;
+			while(i<512) do
+				[512*[Child_PTBR + 2*page_index + 0] + i]=[512*[Parent_PTBR + 2*page_index + 0] + i];
+				i=i+1;
+			endwhile;
+			page_index=page_index+1;
+		endwhile;
+		
+		//Calculate the  Child process PCB
+		alias PCB_Child S10;
+		PCB_Child=READY_LIST + 32*PCB_index; //PCB_Child=READY_LIST + 32*Child_PID;
+		alias PCB_Parent S11;
+		PCB_Parent=READY_LIST + 32*Parent_PID;
+
+		//Step 5
+		//Set the PTBR field in the child process calculated in the previous steps;
+		[PCB_Child + 5]=Child_PTBR;
+
+		[PCB_Child + 6] = 4;//Set PTLR
+		//Step 6
+		//Set the IP field in the child process
+		[PCB_Child + 4]=[Physical_SP];
+		print [PCB_Child + 0];
+
+		//Step 7
+		//Set the SP field in the Child process PCB to SP-1
+		[PCB_Child + 3]=SP-1;
+		
+		//Step 8
+		//Copy copy the content of the  BP,R0 to R7 to the Child PCB
+		//Copy BP 
+		[PCB_Child + 2]=BP;
+		//Copy R0 to R7
+		[PCB_Child + 7]=R0;
+		[PCB_Child + 8]=R1;
+		[PCB_Child + 9]=R2;
+		[PCB_Child + 10]=R3;
+		[PCB_Child + 11]=R4;
+		[PCB_Child + 12]=R5;
+		[PCB_Child + 13]=R6;
+		[PCB_Child + 14]=R7;
+		
+		//Step 9
+		//Copy the per process file table from the Parent process to Child process
+		i=0;
+		while(i<16) do
+			//Copy the content of the PPFT table
+			[PCB_Child + 15 + i + 0]=[PCB_Parent + 15 + i + 0];
+			[PCB_Child + 15 + i + 1]=[PCB_Parent + 15 + i + 1];
+
+			//Increment the File open count in the system wide open file table if file is open
+			if ([PCB_Parent + 15 + i + 0]!=-1) then
+				[[PCB_Parent + 15 + i + 0] + 1]=[[PCB_Parent + 15 + i + 0] + 1] + 1;		
+			endif;
+			i=i+2;		
+		endwhile;
+
+		//Step 10
+		//Set the State of the Child process as Ready
+		[PCB_Child + 1]=1;
+
+		//Step 11
+		//Set the PID of the child as obtained in the step 2 to the Physical_SP-2
+		[Physical_SP-2]=PCB_index;
+		breakpoint;
+		//Step 12
+		//The value -2 is stored in the childs stack space return to th Physical_SP-1
+		alias Child_Physical_SP S12;
+		Child_Physical_SP=[Child_PTBR + 2*((SP-1)/512)]*512 + ((SP-1)%512);
+		
+		print [Child_PTBR + 2*((SP-1)/512)];
+		print Child_Physical_SP;
+		[Child_Physical_SP-1]=-2;
+
+		//Step 13
+		//Control is passed to the parent process
+		breakpoint;
+		ireturn;
+
+
+
+		// alias PPFTStart S7;
+		// PPFTStart=PTBR + 32*Parent_PID;
+		// alias ValidPg S8;
+		// ValidPg=0;
+		// //alias i S8;
+
+		// //i=0;
+		// while(i<8) do
+		// 	// if ([PPFTStart + i]=="01") then
+		// 	// 	ValidPg=ValidPg + 1;
+		// 	// endif;
+		// 	// if ([PPFTStart + i]=="11") then
+		// 	// 	ValidPg=ValidPg + 1;    					
+		// 	// endif;
+		//    	print [Par + i];
+		//    	i=i+1;			  
+		// endwhile;
+		// print "ValidPg";
+		// print ValidPg;
+
+		// //PTBR=(1024+8*Parent_PID);
+
+		// //Check equal no of page_index in the MEM_LIST as in the parents per process page_index table
+		// alias FreePgs S9;
+		// FreePgs=0;
+		// i=0;
+
+		// while(i<64) do
+		//    if ([MEM_LIST + i]==0) then
+		//    		FreePgs=FreePgs+1;
+		//    endif;
+		//    i=i+1;			
+		// endwhile;
+		// if (ValidPg>FreePgs) then
+		// 	print "Insufficent Memory";
+		// 	[Physical_SP-2]=-1;
+		// 	ireturn;
+		// endif;
+
+		// //[READY_LIST + 32*PCB_index +]
+		// //Allocate equal no of free page to the child as the parent proocess
+		// i=0;
+		// alias j S10;
+		// j=0;
+		// alias k S11;
+		// while(ValidPg!=0) do
+		// 	if ([MEM_LIST + i]==0) then
+		// 		[MEM_LIST + i]=1;	//Set the MEM_LIST page_index as used
+		// 		ValidPg=ValidPg-1;
+		// 		print i;
+		// 		print [PPFTStart + j];
+		// 		//copy the content of the parent page_index to the child page_index
+		// 		k=0;
+		// 		while(k<512) do
+		// 		 	[512*i + k]=[512*[PPFTStart + j] + k];
+		// 		 	k=k+1;	
+		// 		endwhile;
+		// 		//Set the entry of page_index in childs page_index table
+		// 		[PTBR + 32*PCB_index + j + 0]=i; //As childs PID = PCBindex
+		// 		[PTBR + 32*PCB_index + j + 1]=[PPFTStart + j + 1];
+		// 		j=j+1;
+		// 	endif;
+		// 	i=i+1;
+		// endwhile;
+
+
+	[Physical_SP -2]=0;
+	ireturn;
+	endif;

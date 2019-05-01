@@ -2,10 +2,12 @@ decl
 integer FilePtrOdd,FilePtrEven,FilePtrMerge;
 integer a,b,c;
 integer i,j,k;
+string file1,file2,filenamemerge;
 enddecl
 
 integer main()
 {   //Write odd numbers in oddnum.dat file
+
 	FilePtrOdd=Create("oddnum.dat");
 	print(FilePtrOdd);
 	FilePtrOdd=Open("oddnum.dat");
@@ -34,9 +36,10 @@ integer main()
 
 
 	//Merge Files oddnum and evennum in merge file
-	FilePtrMerge=Create("Merge.dat");
+	read (filenamemerge);
+	FilePtrMerge=Create(filenamemerge);
 	print(FilePtrMerge);
-	FilePtrMerge=Open("Merge.dat");
+	FilePtrMerge=Open(filenamemerge);
 	FilePtrOdd=Open("oddnum.dat");
 	print(FilePtrOdd);
 	FilePtrEven=Open("evennum.dat");
