@@ -24,7 +24,7 @@ integer main()
 		ChildPID=Fork();
 		//a=Wait(ChildPID);
 
-		if (ChildPID!=-2) then
+		if (ChildPID==-2) then
 		    a=Exec(Command);
 
 			if (a==-1) then
@@ -33,7 +33,7 @@ integer main()
 			endif;
 			//continue;	
 		endif;
-		if (ChildPID==-2) then
+		if (ChildPID!=-2) then
 			a=Wait(ChildPID);
 
 		endif;

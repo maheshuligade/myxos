@@ -1,5 +1,5 @@
 
-print "Timer Started";
+//print "Timer Started";
 alias current_PID S0;
 
 current_PID=(PTBR- 1024)/8; 				//calculating PID of the process 
@@ -82,5 +82,5 @@ newPhysical_SP = (([PTBR + 2*(SP /512)] *512 )+(SP % 512));    //calculate the p
 [newPCB + 1]=2; //set STATE to RUNNING;
 
 //SP = SP -1;
-print "Timer Ended";
+//print "Timer Ended";
 ireturn;

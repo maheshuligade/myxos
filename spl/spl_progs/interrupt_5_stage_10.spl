@@ -1,0 +1,289 @@
+//Fork System Call
+//Description : Replicates the process which invoked this System Call in the memory.
+//System Call No: 8
+//Interrupt No:5
+//Return Value:In the parent parent process,PID of the process created (Success) or -1 (Failure).
+//				In the child process ,-2 for success ,and if it is fails no child process is
+//				created.
+
+//Calculate the physical address of the Stack
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+alias SysCallNo S1;
+SysCallNo=[Physical_SP -1];
+//print SysCallNo;
+if (SysCallNo==8) then
+	//print "Fork SysCall";
+	//Step 1
+	//Find a free PCB in the READY_LIST
+
+	//Step 2
+	//Store the PCB_index of the free PCB into the register
+	alias Child_PID S2;
+	Child_PID=0;
+	while(Child_PID < 32) do
+		if ([READY_LIST + 32*Child_PID + 1]==0) then
+			//print "Free PCB found";
+			break;
+		endif;
+		Child_PID=Child_PID+1;
+	endwhile;
+
+	if (Child_PID==32) then
+		//print "No free PCB";
+		[Physical_SP - 2]=-1;
+		ireturn;
+	endif;
+
+	//Step 3
+	//Set the PID value of the child process with the value obtained in step 2
+	//print PCB_index;
+	[READY_LIST + 32*Child_PID + 0]=Child_PID;
+
+	//Step 4
+	//Count the page_index in the PPFT of the parent process
+	alias Parent_PID S3;
+	Parent_PID=(PTBR - 1024)/8;
+	alias Parent_PTBR S4;
+	alias Child_PTBR S5;
+
+	Parent_PTBR= PAGE_TABLE + 8*Parent_PID;
+	Child_PTBR=PAGE_TABLE + 8*Child_PID; //AS PCB_index=Child_PID
+
+	alias Page_Index S6;
+	Page_Index=0;
+	alias MEM_LIST_ENTRY S7;
+	breakpoint;
+	MEM_LIST_ENTRY=25;
+	alias j S8;
+
+
+
+	//Find 1 free page in the MEM_LIST for the stack 
+	while(MEM_LIST_ENTRY < 64) do	
+		if ([MEM_LIST + MEM_LIST_ENTRY]==0) then
+			break;
+		endif;
+		MEM_LIST_ENTRY=MEM_LIST_ENTRY + 1;
+	endwhile;
+	alias VictimPage S9;
+	alias Process_PTBR S10;
+	Process_PTBR=Child_PTBR;
+	alias SWAP_Block S11;
+	//Check if enough pages are present  in the Memory,if not return Insufficent Memory
+	if (MEM_LIST_ENTRY==64) then
+		print "Insufficent Memory";
+		
+		//alias j S12;
+			j=0;
+			while(j < 32) do
+				// if (j>32) then	
+				// 	j=0;
+				// endif;
+				j=(j+1)%32;
+				Process_PTBR=PAGE_TABLE + 8*j;	
+				VictimPage=Process_PTBR;
+				while (VictimPage < Process_PTBR + 6) do
+					//print [VictimPage + 1];
+					//print "*****";
+					//print [MEM_LIST + [VictimPage]];
+					if ([DISK_LIST + [VictimPage]]>1) then
+						
+						VictimPage=VictimPage+2;
+						continue;
+					endif;
+					if ([VictimPage + 1]=="01") then
+						j=32;
+						break;
+					endif;
+					if ([VictimPage + 1]=="10" && [MEM_LIST + [VictimPage]]==1) then
+						[VictimPage + 1]="00";
+					endif;
+
+					if ([VictimPage + 1]=="11" && [MEM_LIST + [VictimPage]]==1) then
+						[VictimPage + 1 ]="01";
+						// print "*****";
+						// print [VictimPage];
+						//continue;
+					endif;			
+					VictimPage=VictimPage+2;
+				endwhile;
+						
+			endwhile;
+
+		SWAP_Block=448;
+		while(SWAP_Block <=511) do
+			if ([DISK_LIST + SWAP_Block]==0) then
+				MEM_LIST_ENTRY=[VictimPage];
+				break;
+			endif;
+			SWAP_Block=SWAP_Block+1;
+		endwhile;
+
+		if (SWAP_Block==512) then
+			// [Physical_SP - 1]=10;
+			// inline "JMP 11776";
+			[Physical_SP-2]=-1;
+			ireturn;
+		endif;
+		
+		//Store the victim page in the swap block (SWAP Out).
+		store([VictimPage],SWAP_Block);
+		//Increment the DISK_LIST of the SWAP_Block  by 1
+		[DISK_LIST + SWAP_Block]= 1;
+
+		//The entry for this victim page in the per process page table is updated with the address block
+		//in the swap area of the disk and set as invalid (Valid bit in the auxiliary information as 0)
+		[VictimPage + 0]=SWAP_Block;
+		[VictimPage + 1]="00";
+		// 	[Physical_SP-2]=-1;
+		// ireturn;				
+	endif;
+	//Update the MEM_LIST 
+	[MEM_LIST + MEM_LIST_ENTRY]= 1;
+	//Allocate this free page for the stack of the  child process
+	[Child_PTBR + 2*3 + 0]=MEM_LIST_ENTRY;
+	//Copy the stack page of the parent process to the stack page of the child process word by word
+	j=0;
+	while(j < 512) do
+		[512*[Child_PTBR + 2*3 + 0] + j]=[512*[Parent_PTBR + 2*3 + 0] + j];
+		j=j+1;
+	endwhile;
+	//Find the per process page table of the child process 
+	//The 4th page of entry of the page table of the child process must be set to the physical page number of the stack
+	//page allocated and the auxiliary information to "01" (unreferenced and valid).
+	[Child_PTBR + 2*3 + 1]="01";
+
+	Page_Index=0;
+	//Copy the all the entries from the parent process to the child process one by one including the auxiliary information
+	while(Page_Index <=2) do
+		//if ([Parent_PTBR + 2*Page_Index + 0]!=-1) then
+			[Child_PTBR + 2*Page_Index + 0]=[Parent_PTBR + 2*Page_Index + 0];
+			[Child_PTBR + 2*Page_Index + 1]=[Parent_PTBR + 2*Page_Index + 1];
+		// else
+		// 	[Child_PTBR + 2*Page_Index + 0]=-1;
+		// 	[Child_PTBR + 2*Page_Index + 1]=[Parent_PTBR + Page_Index + 1]; 
+		// endif;
+		Page_Index=Page_Index+1;
+	endwhile;
+
+	// alias Page_Index S9;
+	Page_Index=0;
+	while(Page_Index <=2) do
+		//if ([Child_PTBR + 2*Page_Index + 0]!=-1) then
+			if ([Child_PTBR + 2*Page_Index + 1]=="01"|| [Child_PTBR + 2*Page_Index + 1]=="11") then		
+				//This indicates that this page is shared by more than one processes	
+				[MEM_LIST + [Child_PTBR+ 2*Page_Index + 0]]=[MEM_LIST + [Child_PTBR + 2*Page_Index + 0]] + 1;
+		//	endif;	
+
+		else
+			//This indicates that this code page is resides in the Disk Swap area at this block number.
+			if([Child_PTBR + 2*Page_Index + 0]>=448)then
+				//This indicates that this page is shared by more than one processes	
+				[DISK_LIST + [Child_PTBR + 2*Page_Index + 0]]=[DISK_LIST + [Child_PTBR + 2*Page_Index + 0]] + 1;
+			endif;
+			//endif;
+		endif;
+		Page_Index = Page_Index + 1; 
+	endwhile;
+	//Store the DISK_LIST back to the disk.
+	store(6,20);
+
+	
+
+
+
+
+
+
+
+	//For each valid pages of the parent process the contents needs to be 
+	//copied in the childs pages
+	alias i S12;
+	// page_index=0;
+	// while(page_index < 4) do
+	// 	//Copy the content of the Parent pages to the Child pages
+	// 	if([Child_PTBR + 2*page_index + 0]!=-1) then
+	// 		[MEM_LIST + [Child_PTBR + 2*page_index + 0]]=1;
+	// 		i=0;
+	// 		while(i<512) do
+	// 			[512*[Child_PTBR + 2*page_index + 0] + i]=[512*[Parent_PTBR + 2*page_index + 0] + i];
+	// 			i=i+1;
+	// 		endwhile;
+	// 	endif;
+	// 	page_index=page_index+1;
+	// endwhile;
+		
+	//Calculate the  Child process PCB
+	alias PCB_Child S13;
+	PCB_Child=READY_LIST + 32*Child_PID; //PCB_Child=READY_LIST + 32*Child_PID;
+	alias PCB_Parent S14;
+	PCB_Parent=READY_LIST + 32*Parent_PID;
+
+	//Step 5
+	//Set the PTBR field in the child process calculated in the previous steps;
+	[PCB_Child + 5]=Child_PTBR;
+
+	[PCB_Child + 6] = [PCB_Parent + 6];//Set PTLR
+	//Step 6
+	//Set the IP field in the child process
+	[PCB_Child + 4]=[Physical_SP];
+	//print [PCB_Child + 0];
+
+	//Step 7
+	//Set the SP field in the Child process PCB to SP-1
+	[PCB_Child + 3]=SP-1;
+		
+	//Step 8
+	//Copy copy the content of the  BP,R0 to R7 to the Child PCB
+	//Copy BP 
+	[PCB_Child + 2]=BP;
+	//Copy R0 to R7
+	[PCB_Child + 7]=R0;
+	[PCB_Child + 8]=R1;
+	[PCB_Child + 9]=R2;
+	[PCB_Child + 10]=R3;
+	[PCB_Child + 11]=R4;
+	[PCB_Child + 12]=R5;
+	[PCB_Child + 13]=R6;
+	[PCB_Child + 14]=R7;
+	//Set the parent PID at the 31 location of the child PCB
+	[PCB_Child + 31]=Parent_PID;
+
+	//Step 9
+	//Copy the per process file table from the Parent process to Child process
+	i=0;
+	while(i<16) do
+		//Copy the content of the PPFT table
+		[PCB_Child + 15 + i + 0]=[PCB_Parent + 15 + i + 0];
+		[PCB_Child + 15 + i + 1]=[PCB_Parent + 15 + i + 1];
+
+		//Increment the File open count in the system wide open file table if file is open
+		if ([PCB_Parent + 15 + i + 0]!=-1) then
+			[[PCB_Parent + 15 + i + 0] + 1]=[[PCB_Parent + 15 + i + 0] + 1] + 1;		
+		endif;
+		i=i+2;		
+	endwhile;
+
+	//Step 10
+	//Set the State of the Child process as Ready
+	[PCB_Child + 1]=1;
+
+	//Step 11
+	//Set the PID of the child as obtained in the step 2 to the Physical_SP-2
+	[Physical_SP-2]=Child_PID;
+	breakpoint;
+	//Step 12
+	//The value -2 is stored in the childs stack space return to th Physical_SP-1
+	alias Child_Physical_SP S15;
+	Child_Physical_SP=[Child_PTBR + 2*((SP-1)/512)]*512 + ((SP-1)%512);
+		
+	//print [Child_PTBR + 2*((SP-1)/512)];
+	//print Child_Physical_SP;
+	[Child_Physical_SP-1]=-2;
+
+	//Step 13
+	//Control is passed to the parent process
+	breakpoint;
+	ireturn;
+endif;

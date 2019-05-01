@@ -1,0 +1,216 @@
+//Exception Handler
+
+//Step 1
+//The details corresponding to the exception is stored in EFR register.The individual values of EFR must be
+//extracted and to register.
+alias Cause S0;
+alias VPagenum S1;
+alias Ip_addr S2;
+Cause=EFR%10;					//Get value of the cause field (size 1 char)
+VPagenum=(EFR/10)%100;			//Get value of BadVAddr
+Ip_addr=(EFR/1000);				//Get value of IP at the point of exception.
+
+//Step 2
+alias Physical_SP S3;
+Physical_SP=(([PTBR + 2*(SP/512)]*512) + (SP%512));
+
+if (Cause==1) then
+	print "Illegal Instruction";
+	[Physical_SP - 1]=10;
+	inline "JMP 11776";
+endif;
+
+if (Cause==2) then
+	print "Illegal memory access";
+	[Physical_SP - 1]=10;
+	inline "JMP 11776";
+endif;
+if (Cause==3) then
+	print "Arithmatic Exception";
+	[Physical_SP - 1]=10;
+	inline "JMP 11776";
+endif;
+if (Cause==4) then
+	print "Illegal Operads";
+	[Physical_SP - 1]=10;
+	inline "JMP 11776";
+endif;
+
+//Step 3
+if (Cause==0) then
+	//print "Page Fault";
+	//print [PTBR + 2*VPagenum];
+	//If the physical page no field of PPFT corresponding to the VPagenum is -1,Indicating that 
+	//a reference to an invlid address was made by the user ,the currently running process made to exit.
+	if ([PTBR + 2*VPagenum]==-1) then
+		[Physical_SP - 1]=10;
+		inline "JMP 11776";
+	endif;
+
+	//Find the free page in the MEM_LIST_ENTRY
+	alias MEM_LIST_ENTRY S4;
+	alias new_page S5;
+	MEM_LIST_ENTRY=0;
+	while(MEM_LIST_ENTRY < 64) do
+		if ([MEM_LIST + MEM_LIST_ENTRY]==0) then
+			//Update the MEM_LIST by setting 1 as used.
+			[MEM_LIST + MEM_LIST_ENTRY]=1;
+			break;
+		endif;
+		MEM_LIST_ENTRY=MEM_LIST_ENTRY+1;
+	endwhile;
+
+	//print MEM_LIST_ENTRY;
+
+
+	//If free page is not found in the MEM_LIST,then we will find free page by Page Replacement Algorithm 
+	//like Second Chance Algorithm to find the free page.
+	if (MEM_LIST_ENTRY==64) then
+		//print "Replacing Page";
+
+		alias VictimPage S6;
+	//	VictimPage=PTBR - 8;
+		alias Current_PID S7;
+		Current_PID = (PTBR - 1024)/8;
+		alias Process_PTBR S8;
+		Process_PTBR=PAGE_TABLE;
+		alias SWAP_Block S9;
+		// print "****";
+		// print [PAGE_TABLE + 8*Current_PID + 2];
+		// print [PTBR + 2];
+
+		// while(1) do
+		// 	print [PTBR + VictimPage];
+		// 	if ([PTBR + VictimPage + 1]=="01") then
+		// 		break;
+		// 	endif;
+
+		// 	if ([PTBR + VictimPage + 1]=="10") then
+		// 		[PTBR + VictimPage + 1]="00";
+		// 	endif;
+
+		// 	if ([PTBR + VictimPage + 1]=="11") then
+		// 		[PTBR + VictimPage + 1]="01";
+		// 	endif;
+
+
+		// 	VictimPage = (VictimPage +2)%PTBR;
+		// 	Current_PID=(Current_PID + 1)%32;
+
+		// endwhile;
+		alias j S10;
+		j=0;
+		while(j < 32) do
+			VictimPage=Process_PTBR;
+			while (VictimPage < Process_PTBR + 6) do
+				//print [VictimPage + 1];
+				//print "*****";
+				//print [MEM_LIST + [VictimPage]];
+				if ([DISK_LIST + [VictimPage]]>1) then
+					VictimPage=VictimPage+2;
+					continue;		
+				endif;
+				if ([VictimPage + 1]=="01") then
+					// if ([MEM_LIST + [VictimPage]]>1) then
+						
+					
+					// 	VictimPage=VictimPage+2;
+					// 	continue;
+					// endif;
+					j=32;
+					break;
+				endif;
+				if ([VictimPage + 1]=="10" && [MEM_LIST + [VictimPage]]==1) then
+					[VictimPage + 1]="00";
+				endif;
+
+				if ([VictimPage + 1]=="11" && [MEM_LIST + [VictimPage]]==1) then
+					[VictimPage + 1 ]="01";
+					// print "*****";
+					// print [VictimPage];
+					continue;
+				endif;			
+				VictimPage=VictimPage+2;
+			endwhile;
+			j=j+1;
+			Process_PTBR=Process_PTBR + 8;			
+		endwhile;
+
+		//Find the free block in the swap area for swapping out the VictimPage 
+		//If no free space is present then exit the process
+			
+		//print SWAP_Block;
+		SWAP_Block=448;
+		while(SWAP_Block <=511) do
+			if ([DISK_LIST + SWAP_Block]==0) then
+					MEM_LIST_ENTRY=[VictimPage];
+					//print "Swap";
+					break;
+			endif;
+			SWAP_Block=SWAP_Block+1;
+		endwhile;
+
+		if (SWAP_Block==512) then
+			[Physical_SP - 1]=10;
+			inline "JMP 11776";
+		endif;
+
+		//Store the victim page in the swap block (SWAP Out).
+		store([VictimPage],SWAP_Block);
+		//Increment the DISK_LIST of the SWAP_Block  by 1
+		[DISK_LIST + SWAP_Block]=[DISK_LIST + SWAP_Block]+1;
+
+		//The entry for this victim page in the per process page table is updated with the address block
+		//in the swap area of the disk and set as invalid (Valid bit in the auxiliary information as 0)
+		[VictimPage + 0]=SWAP_Block;
+		[VictimPage + 1]="00";
+		//print VPagenum;
+	endif;
+
+
+	alias Physical_Page_No S11;
+	Physical_Page_No=[PTBR + 2*VPagenum];
+	//print [PTBR + VPagenum];
+
+	
+	//Check if the Physical_Page_No is disk block if it is then load into the free page
+	if (Physical_Page_No >=20 && Physical_Page_No <=447) then
+		load(MEM_LIST_ENTRY,Physical_Page_No);
+	endif;
+	if (Physical_Page_No>=448&&Physical_Page_No<=511) then
+		load(MEM_LIST_ENTRY,Physical_Page_No);
+		//Decrement the DISK_LIST ENTRY by 1
+		[DISK_LIST + Physical_Page_No]=[DISK_LIST +Physical_Page_No]-1;
+	endif;
+
+	//Set the Physical_Page_No corresponding to the VPagenum in the PAGE_TABLE with the page number of
+	//Memory page allocated and set the auxiliary information as "11"(Referenced and Valid)
+	[PTBR + 2*VPagenum + 0]=MEM_LIST_ENTRY;
+	[PTBR + 2*VPagenum + 1]="11";
+
+	//Increment the SP by 1 beacuse a new value needs to be placed on the top of the stack.
+	//Place the Ip_addr obtained from the EFR on top of the stack of the current process.
+	//The Ip_addr value gives the address which issued the page fault.
+	//The IRET instruction will correctly set IP to this value and re-execute the instruction which
+	//caused the exception.
+	SP=SP+1;
+	Physical_SP=(([PTBR + 2*(SP/512)]*512)+(SP%512));
+	[Physical_SP]=Ip_addr;
+	alias Current_PID S13;
+	alias Process_PTBR S14;
+	alias j S15;
+	Process_PTBR=PAGE_TABLE;
+	j=Process_PTBR+6;
+	Current_PID=(PTBR - 1024)/8;
+	while(Process_PTBR<j) do
+		if ([Process_PTBR + 0]>=448) then
+			print "Swap Block Used";
+			print Current_PID;
+		endif;
+		Process_PTBR=Process_PTBR+2;
+	endwhile;
+
+	//Return to the user mode using ireturn
+	ireturn;
+
+endif;
