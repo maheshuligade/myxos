@@ -62,7 +62,7 @@ PTBR_Process1=1024 + 1*8; 		//startig address of the page table=1024 + pid*8
 //[PTBR_Process2 + 6]=32 ;		//Physical page number for load page 3
 //[PTBR_Process2 + 7]="01"; 		//not reffrenced and valid
 
-[READY_LIST + 33]=2;			 //state is ready;
+[READY_LIST + 33]=0;			 //state is ready;
 [READY_LIST + 37]=PTBR_Process1; //PTBR 
 [READY_LIST + 38]=4; 		    //PTLR
 [READY_LIST + 34]=3*512; 	    //set the entry for BP in the PCB;

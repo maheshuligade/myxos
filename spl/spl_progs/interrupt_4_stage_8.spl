@@ -1,0 +1,160 @@
+//Calculate Physical Address of the Stack Pointer
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+
+
+//Get arguments from the Stack
+//Get System Call No
+alias SysCallNo S1;
+SysCallNo = [Physical_SP - 1];
+print "SysCallNo";
+print SysCallNo;
+
+breakpoint;
+
+if (SysCallNo==5) then
+	 //Write System Call
+	print "Write SysCall";
+	 //Description:Used to Write a single word to a file opened by the process
+	 //System Call No: 5
+	 //Interrupt No: 4
+	 //Arguments: 1 fileDescriptor, 2 wordToWrite	
+	 //Return Value : -1 (Failure) or 0 (Success)
+	 alias fileDescriptor S2;
+	 fileDescriptor = [Physical_SP - 4];
+	 print "fileDescriptor";
+	 print fileDescriptor;
+	 
+	 alias wordToWrite S3;
+	 wordToWrite = [Physical_SP - 3];
+	 print "wordToWrite";
+	 print wordToWrite;
+	//Step 1
+	//Check fileDescriptor is valid or not
+	 if ((0>fileDescriptor)||(7<fileDescriptor)) then
+			print "Invalid fileDescriptor";
+				[Physical_SP - 2] = -1;
+				ireturn;
+	 endif;
+
+	 //Step 2
+	 //Index into the PPFT 
+	alias Current_PID S4;
+	Current_PID = (PTBR - 1024)/8;
+	print "Current_PID";
+	print Current_PID;
+	alias PPFTStart S5;
+	PPFTStart = READY_LIST + 32*Current_PID + 15;
+	print "PPFTStart";
+	print PPFTStart;
+	print "PoSWOFT";
+	print [PPFTStart + 2*fileDescriptor + 0];
+	print "LSEEK";
+	print [PPFTStart + 2*fileDescriptor + 1];
+	
+	if ([PPFTStart + 2*fileDescriptor + 0]==-1) then
+		//Invalid Pointer to System Wide Open File Table
+		print "Invalid SWOFT Pointer";
+		[Physical_SP - 2] = -1;
+		ireturn;
+		
+	endif;
+	
+
+	//Step 3
+	alias PoSWOFT S6;
+	alias LSEEK S7;
+	PoSWOFT = [PPFTStart + 2*fileDescriptor + 0];
+	LSEEK = [PPFTStart + 2*fileDescriptor + 1];
+	
+	//Step 4
+	alias FAT_Index S8;
+	FAT_Index = [FILE_TABLE + 2*PoSWOFT];
+	print "FAT_Index";  
+	print FAT_Index;
+
+	//Step 5
+	//Load basic block from FAT to SCRATCHPAD
+	alias basic_block S9;
+	basic_block = [FAT + 8*FAT_Index + 2];
+	print "basic_block";
+	print basic_block;
+	load(1,basic_block);
+	
+	
+	//Step 6
+	alias DATABIndex S10;
+	alias DATABlock S11;
+	//Calculate DATA Block Index from the LSEEK position
+	DATABIndex =LSEEK / 512;
+	DATABlock = [SCRATCHPAD + DATABIndex];    
+		
+	if (DATABlock == -1) then
+		print "Invalid DATABlock";
+		//Invalid Data block so allocate new data block
+			//Find free block in the disk free list
+			alias Free_block S12;
+			Free_block = 24;
+			while(Free_block < 447) do
+				if ([Free_block + DISK_LIST]==0) then
+				   	print "Free_block Found";
+				   	print Free_block;    	
+				   	break;
+				endif;   	
+						  
+				Free_block = Free_block + 1;				
+		  endwhile;
+		 if (Free_block==447) then
+		 		//Return from the system call
+		 		print "No Free_block";
+		 		[Physical_SP - 2]=-1;
+		 		ireturn;
+		 endif;
+
+		 //Set the entry of the free block 1
+		 [Free_block + DISK_LIST] = 1;
+     //Add this block to the basic block of the file
+     [SCRATCHPAD + DATABIndex]=	Free_block;
+     //Commit the basic block from the memory to the disk
+     store(1,basic_block);
+     //Increment the file size in the FAT by 512
+
+     [FAT + 8*FAT_Index + 1]=[FAT + 8*FAT_Index + 1] + 512;
+     
+     //Store FAT from memory to disk
+     store(5,19);
+     //Store Disk Free List from memory to disk
+     store(6,20);
+     		
+	endif;
+	//Step 7
+	//Load the datablock from disk to memory
+	alias i S13;
+	load(1,DATABlock);
+
+  //Step 8
+  //Write wordToWrite to the in seek position in the datablock
+  alias offset S14;
+  offset = LSEEK % 512;
+
+  [SCRATCHPAD + offset]=wordToWrite;
+  //Step 9
+  //Store back this datablock from memory to disk
+  store(1,DATABlock);
+
+  //Step 10
+  //Increse the LSEEK position in the per process open file table by 1
+
+  [PPFTStart + 2*fileDescriptor + 1]=[PPFTStart + 2*fileDescriptor + 1] + 1;
+
+  //Step 11
+  //Return from the system call with value 0 (Success)
+   
+  [Physical_SP - 2]=0;
+  ireturn; 
+endif;
+
+//Invalid System Call No
+print "Invalid SysCallNo";
+[Physical_SP - 2] = -1;
+ireturn;

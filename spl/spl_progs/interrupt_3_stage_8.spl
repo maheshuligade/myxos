@@ -1,0 +1,216 @@
+//Calculate the Physical address of the Stack Pointer
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+
+//Get arguments from the Stack
+//Get System Call No
+print "Interrupt=3";
+alias SysCallNo S1;
+SysCallNo = [Physical_SP - 1];
+print "SysCallNo";
+print SysCallNo;
+
+breakpoint;
+
+if (SysCallNo == 6) then
+	print "SEEK SysCall";
+	//Description:Changes the LSEEK position
+	//System Call No:6
+	//Interrupt No:3
+	//Arguments:1.fileDescriptor 2.newLSEEK
+	//Return Value: -1 (Failure) or 0 (Success)
+	alias newLSEEK S2;
+	newLSEEK = [Physical_SP - 3];
+	print "newLSEEK";
+	print newLSEEK;
+	alias fileDescriptor S3;
+	fileDescriptor = [Physical_SP - 4];
+	print "fileDescriptor";
+	print fileDescriptor;
+
+	//Step 1
+	//Check the fileDescriptor is valid or not
+	if ((0 > fileDescriptor)||(7 < fileDescriptor)) then
+		print "Invalid fileDescriptor";
+		[Physical_SP - 2] = -1;
+		ireturn;	
+	endif;
+
+	//Step 2
+	//Index into the per process open file table in the PCB with the fileDescriptor
+    
+    alias Current_PID S4;
+    Current_PID = (PTBR - 1024)/8;
+
+    alias PPFTStart S5;
+    PPFTStart = READY_LIST + 32*Current_PID + 15;
+
+    //Check the entry of the Pointer to System Wide Open File Table is valid or not
+
+    if ([PPFTStart + 2*fileDescriptor + 0]==-1) then
+    	//Return from the System Call with -1
+    	print "Invalid PtrToSWOFT";
+    	[Physical_SP - 2]=-1;
+    	ireturn; 	    	
+    endif;
+
+    //Step 3
+    alias PtrToSWOFT S6;
+    PtrToSWOFT = [PPFTStart + 2*fileDescriptor + 0];
+
+    //Step 4
+    //Using the Pointer to System Wide Open File Table 
+    //index into the System Wide Open File Table and get FAT Index
+    alias FAT_Index S7;
+    FAT_Index = [FILE_TABLE + 2*PtrToSWOFT + 0]; 
+ 	
+ 	//Step 5
+ 	//Fetch the file size of the file and store in the register
+    alias FILE_SIZE S8;
+    FILE_SIZE = [FAT + 8*FAT_Index + 1];
+
+    //Step 6
+    //Check LSEEK position is valid or not
+
+    if ((0 > newLSEEK)||(FILE_SIZE < newLSEEK)) then
+      print "Invalid LSEEK";
+      [Physical_SP - 2] = -1;
+      ireturn;    	
+    endif;
+
+    //Step 7
+    //Change the LSEEK to new LSEEK in the FILE_TABLE
+    print "LSEEK";
+    print [PPFTStart + 2*fileDescriptor + 1];
+    print "newLSEEK";
+    print newLSEEK;
+
+    [PPFTStart  + 2*fileDescriptor + 1] = newLSEEK;
+
+    //Step 8
+    //Return from System Call with 0 (Success)
+    [Physical_SP - 2] = 0;
+    ireturn;
+	
+endif;
+
+if (SysCallNo==7) then
+ print "Read SysCallNo";
+ //Description:Reads a word from a file to the variable passed as argument
+ //System Call No: 7
+ //Interrupt No: 3
+ //Arguments : 1.fileDescriptor 2.wordRead
+ //Return Value: -1 (Failure) or 0 (Success)
+ alias fileDescriptor S2;
+ fileDescriptor = [Physical_SP - 4];
+ print "fileDescriptor";
+ print fileDescriptor;
+
+ //Step 1
+ //Check the fileDescriptor is valid or not
+ if ((0 > fileDescriptor)||(7 < fileDescriptor)) then
+    print "Invalid fileDescriptor";
+    [Physical_SP - 2] = -1;
+    ireturn;     
+ endif;
+
+ //Step 2
+ //Index into the per process open file table 
+alias Current_PID S3;
+alias PPFTStart S4;
+Current_PID = (PTBR - 1024)/8;
+print "Current_PID";
+print Current_PID;
+PPFTStart = READY_LIST + 32*Current_PID + 15;
+alias PtrToSWOFT S5; 
+PtrToSWOFT= [PPFTStart + 2*fileDescriptor + 0];
+//Check the entry is valid or not
+if (PtrToSWOFT==-1) then
+    print "Invalid PtrToSWOFT";
+    [Physical_SP - 2] = -1;
+    ireturn;    
+endif;
+
+//Step 3
+print "PtrToSWOFT";
+print PtrToSWOFT;
+alias LSEEK S6;
+LSEEK = [PPFTStart + 2*fileDescriptor + 1];
+print "LSEEK";
+print LSEEK;
+
+//Step 4
+//Index into the System Wide Open File Table and get the FAT index
+alias FAT_Index S7;
+FAT_Index = [FILE_TABLE + 2*PtrToSWOFT];
+print "FAT_Index";
+print FAT_Index;
+
+//Step 5
+//Using the FAT index fetch the basic block of the file from FAT to the file
+alias basic_block S8;
+basic_block = [FAT + 8*FAT_Index + 2];
+//File size
+alias FILE_SIZE S9;
+FILE_SIZE = [FAT + 8*FAT_Index + 1];
+print "basic_block";
+print basic_block;
+print "FILE_SIZE";
+print FILE_SIZE;
+load(1,basic_block);
+
+//Step 6
+//Check the LSEEK position is at the end of the file or not
+if (FILE_SIZE == LSEEK) then
+ //Return from the System Call nothing to read
+ print "Nothing to Read";
+ [Physical_SP - 2] = -1;
+ ireturn;    
+endif;
+
+alias DATABIndex S10;
+alias DATA_Block S11;
+//Calculate DATA block index from the LSEEK position
+DATABIndex = LSEEK/512;
+print "DATABIndex";
+print DATABIndex;
+DATA_Block = [SCRATCHPAD + DATABIndex];
+print "DATA_Block";
+print DATA_Block;
+
+//Step 7
+//Fetch this DATA Block from disk to SCRATCHPAD
+load(1,DATA_Block);
+
+//Step 8
+//Read from this block using the offset calculated using LSEEK position
+alias offset S12;
+offset = LSEEK%512;
+
+//Step 9
+//Store the word read in the Stack at the position of Arguments 2 (at SP - 3);
+alias wordRead S13;
+wordRead = [SCRATCHPAD + offset];
+[Physical_SP - 3] = wordRead;
+
+//Step 10
+//Increment the LSEEK position in the per process open file table 
+print "LSEEK";
+print LSEEK;
+[PPFTStart + 2*fileDescriptor + 1]=[PPFTStart + 2*fileDescriptor + 1] + 1;
+print "newLSEEK";
+print [PPFTStart + 2*fileDescriptor + 1];
+
+
+//Step 11
+//Return from the system call with 0 indicating Success
+[Physical_SP - 2] = 0;
+ireturn;
+
+
+	
+endif;
+print "Invalid SysCallNo";
+[Physical_SP - 2] = -1;
+ireturn;
+

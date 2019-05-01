@@ -1,0 +1,223 @@
+alias Physical_SP S0;
+Physical_SP=([PTBR + 2*(SP/512)]*512) + (SP%512); //calculate the physical address of the stack pointer
+
+alias SysCallNo S1;
+SysCallNo=[Physical_SP - 1];
+print "SysCallNo";
+print SysCallNo;
+
+breakpoint;
+
+if (SysCallNo==2) then
+  //Implementation of the open system call
+  //Description:The open system call is used to open a file present in the disk
+  //system call no: 2 
+  //Interrupt No:2
+  //Arguments:filename of the file to be opened
+  //Return value:Index of open instance in per process Open File table -1 (Failure)
+  //              or  index of open instance in per process 
+  //              file open file table (Success)
+ 
+  //step 1
+  //take filename from the stack
+  print "Open SysCall";
+  alias File_Name S2;
+  File_Name=[Physical_SP - 3];
+  print "File_Name";
+  print File_Name;
+
+  //Check the given  file is present in the  disk or not
+
+  alias FAT_Index S3;
+  FAT_Index=0;
+
+  while(FAT_Index < 64) do
+      	if ([FAT_Index*8 + FAT]==File_Name) then
+      	  
+      	  print "File Exists";
+      	  break;
+
+      	endif;
+    
+  	 FAT_Index=FAT_Index+1;
+  endwhile;
+
+  if (FAT_Index==64) then
+      print "File Not Exists";
+      [Physical_SP - 2]=-1;
+      ireturn;	
+  endif;
+  
+  //Store the fat index of the file in the register
+ 
+
+ //step 2
+ //Search the fat index is present in the system wide open file table
+  alias SWOFTI S4;
+  SWOFTI=0;
+  while(SWOFTI<64) do
+    if ([SWOFTI*2 + FILE_TABLE]==FAT_Index) then
+        
+        print "SWOFTI FAT FOUND";
+        
+       break;
+
+    endif;
+    SWOFTI=SWOFTI+1;
+  endwhile;
+  
+  if (SWOFTI==64) then
+  	 print "SWOFTI NOT FOUND";
+     //No FAT index entry in the System Wide Open File Table
+     SWOFTI=0;
+     while(SWOFTI<64) do
+        if ([SWOFTI*2 + FILE_TABLE]==-1) then       
+        
+        print "Free SWOFTI entry";
+        break;
+       
+        endif;
+        SWOFTI=SWOFTI+1;
+     endwhile;
+    if (SWOFTI==64) then
+        	
+    	print "No free SWOFTI";
+    	[Physical_SP - 2]=-1;
+    	ireturn;
+    endif;
+  	
+  endif;
+  print "SWOFTI";
+  print SWOFTI;
+
+	alias SWOFTI_FAT S5;
+	SWOFTI_FAT=SWOFTI;
+  //Step 3
+	alias Current_PID S6;
+	Current_PID = (PTBR - 1024)/8;
+
+	alias PPFTIStart S7;
+	PPFTIStart = READY_LIST + 32*Current_PID + 15;
+
+	alias PPFTI S9;
+	PPFTI=0;
+	while(PPFTI < 8) do
+ 
+ 		if ([PPFTIStart + 2*PPFTI]==SWOFTI) then
+        	
+  			print "Free PPFTI entry"; 
+  			break;
+ 		endif;   
+         
+    if ([PPFTIStart + 2*PPFTI]==-1) then
+    	//Set pointer to System Wide open file table entry to System Wide 
+    	//Open File Table fat index 
+        print "sets pointer";
+        [PPFTIStart + 2*PPFTI + 0]=SWOFTI; 
+        //sets LSEEK position to 0
+        [PPFTIStart + 2*PPFTI + 1]=0;        
+        break;
+    endif;
+    PPFTI=PPFTI+1;
+       
+	endwhile;
+   
+	if (PPFTI==8) then
+    	print "No PPFTI entry";
+ 		[Physical_SP - 2]=-1;
+ 		ireturn;
+	endif;
+
+  if ([FILE_TABLE + 2*SWOFTI + 0]==-1) then
+      [FILE_TABLE + 2*SWOFTI + 1]=0;
+      
+  endif;
+	[FILE_TABLE + 2*SWOFTI + 0]=FAT_Index;
+	[FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] + 1;
+	[Physical_SP - 2]=PPFTI;
+
+	ireturn;
+endif;
+
+if (SysCallNo==3) then
+  //Close System Call
+  //Description:Close file opened by the process.
+  //System Call No:3
+  //Interrupt No:2
+  //Arguments:fileDescriptor
+  //Return Value: -1(Failure) 0 (Success)
+  
+  //Stage 1
+  //Checking fileDescriptor is valid or not
+  print "Close SysCall";
+  alias fileDescriptor S2;
+  fileDescriptor=[Physical_SP - 3];
+  print "fileDescriptor";
+  print fileDescriptor;
+  
+  
+  if ((0>fileDescriptor)||(fileDescriptor>7)) then
+        
+     print "Invalid fileDescriptor";
+     [Physical_SP - 2]=-1;
+     ireturn;
+
+  endif;
+
+  print "Valid fileDescriptor";
+  print fileDescriptor;
+  //Stage 2
+  //Checking in the PCB of the process PPFT entry is valid or not
+  alias Current_PID S3;
+  Current_PID = (PTBR - 1024)/8;
+  
+  alias PPFTIStart S4;
+  PPFTIStart=READY_LIST + 32*Current_PID +15;
+  
+    
+     
+     //Check SWOFT validity
+     if ([PPFTIStart + 2*fileDescriptor + 0]==-1) then
+       print "Invalid SWOFTI";
+       [Physical_SP - 2]=-1;
+       ireturn;
+     else
+        //Step 3
+        //Index into the SWOFT
+        alias SWOFTI S5;
+        SWOFTI=[PPFTIStart + 2*fileDescriptor];
+        //Check file is open or not stage 8
+        if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+            print "File already closed";
+            [Physical_SP - 2]=-1;
+            ireturn;
+        endif;
+        //File open validity is checked
+        print "FileOpenCount";
+        print  [FILE_TABLE +2*SWOFTI + 1];
+
+
+        //Decrese the file open count
+        [FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] - 1;
+
+        //Check the file open count is zero
+        if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+             
+          //Set the entry of the FAT index in the SWOFT to invalid
+          [FILE_TABLE + 2*SWOFTI + 0]=-1; 
+           
+
+          //Invalidate PPFT entry
+          [PPFTIStart + 2*fileDescriptor + 0]=-1;
+          [PPFTIStart + 2*fileDescriptor + 1]=-1;            
+        endif;
+       
+     endif;
+  
+    
+    [Physical_SP - 2]=0;
+    ireturn;
+endif;
+print "Invalid SysCallNo";
+[Physical_SP - 2]=-1;
+ireturn;

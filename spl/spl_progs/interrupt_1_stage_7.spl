@@ -1,6 +1,6 @@
 alias Physical_SP S0;
 Physical_SP=([PTBR + 2*(SP/512)]*512)+(SP%512);  //Get the sytem call no from stack and put it
-                                                 // in the register
+																								 // in the register
 //Get arguments from the stack and put it in the register
 
 alias SysCallNo S1;
@@ -11,139 +11,265 @@ print SysCallNo;
 
 breakpoint;
 
+
+
 if (SysCallNo==1) then
-   //Implementation of Create();,Interrupt NO. 1,
-   //arguments:filename,Return value=-1(failure),0(success);
-    ////////////////////////////////////////////////////////////////////////
-    /////////////////////////////|FAT|//////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////
-    ////|    0      |   1       |        2               | 3 - 7       |////
-    ////| File Name | File Size | Block# of Basic Block  |...Unused... |////
-    ////////////////////////////////////////////////////////////////////////
-    alias File_name S2;
-    File_name=[Physical_SP - 3];
-    print "filename";
-    print File_name;
+	 //Implementation of Create();,Interrupt NO. 1,
+	 //arguments:filename,Return value=-1(failure),0(success);
+		////////////////////////////////////////////////////////////////////////
+		/////////////////////////////|FAT|//////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////
+		////|    0      |   1       |        2               | 3 - 7       |////
+		////| File Name | File Size | Block# of Basic Block  |...Unused... |////
+		////////////////////////////////////////////////////////////////////////
+		print "Create SysCall";
+		alias File_name S2;
+		File_name=[Physical_SP - 3];
+		print "filename";
+		print File_name;
 
-    alias current_File S3;
-    current_File= FAT;
+		alias current_File S3;
+		current_File= FAT;
 
-    //Checking if filename already exits.
+		//Checking if filename already exists.
 
-    while(current_File < (FAT + 512)) do
-         
-         if ([current_File + 0]==File_name) then
-            [Physical_SP - 2]=-1;      
-            print "File exits";
-            ireturn;
+		while(current_File < (FAT + 512)) do
+				 
+				 if ([current_File + 0]==File_name) then
+						[Physical_SP - 2]=-1;      
+						print "File exists";
+						ireturn;
 
-           endif;   
-        current_File=current_File + 8;
-    endwhile;
-    print "Creating File";
+				endif;   
+				current_File=current_File + 8;
+		endwhile;
+		print "Creating File";
 
-    alias free_block S3;
-    free_block=24;
+		alias free_block S3;
+		free_block=24;
 
-   
-    //Checking free_block  in the DISK_LIST;
+	 
+		//Checking free_block  in the DISK_LIST;
 
-    while(free_block < 447) do
-          
-      if ([free_block + DISK_LIST]==0) then
-          print "found free space";    
-          print free_block;
-          break;
-      endif;   
-      free_block=free_block+1;
-    endwhile;
+		while(free_block < 447) do
+					
+			if ([free_block + DISK_LIST]==0) then
+					print "found free space";    
+					print free_block;
+					break;
+			endif;   
+			free_block=free_block+1;
+		endwhile;
 
-    //If no free Block found; 
-    if (free_block==447) then
-          print "No free_block"; 
-          [Physical_SP -2 ]=-1;
-          ireturn;     
-    endif;
-
-
-    alias FreeFatLoc S4;
-    FreeFatLoc=FAT;
-  
-    while(FreeFatLoc < FAT + 512) do
-        print [FreeFatLoc];
-        if ([FreeFatLoc + 2]==-1) then
-        
-            print "FatBlockExits";
-            break;
-              
-        endif;    
-      
-        FreeFatLoc=FreeFatLoc+8;
-    endwhile;
-   
-   //No fat Space present
-    if (FreeFatLoc==FAT + 512) then
-
-        print "No FAT block";
-        [Physical_SP -2 ]=-1;
-        ireturn; 
-
-    endif;
-
-    print "free fat_loc=";
-    print FreeFatLoc;  
- 
-   [FreeFatLoc + 0]=File_name;
-   [FreeFatLoc + 1]=0;
-   [FreeFatLoc + 2]=free_block;
-
-   load(1,free_block);
-
-   alias i S5;
-   i=0;
-   while(i < 256) do
-         
-     [SCRATCHPAD + i]=-1;
-     i=i+1;
-     
-   endwhile;
-
-   store(1,free_block);
-
-   
-   [DISK_LIST + free_block]=1;
-   [Physical_SP - 2]=0;
-   
-  //store copies of the Disk Free List and the FAT entries from memory to the Disk
-  store(5,19);
-  store(6,20);
-  ireturn;
+		//If no free Block found; 
+		if (free_block==447) then
+					print "No free_block"; 
+					[Physical_SP -2 ]=-1;
+					ireturn;     
+		endif;
 
 
-
-
-
-
-
-
+		alias FreeFatLoc S4;
+		FreeFatLoc=FAT;
 	
+		while(FreeFatLoc < FAT + 512) do
+				print [FreeFatLoc];
+				if ([FreeFatLoc + 2]==-1) then
+				
+						print "FatBlockExists";
+						break;
+							
+				endif;    
+			
+				FreeFatLoc=FreeFatLoc+8;
+		endwhile;
+	 
+	 //No fat Space present
+		if (FreeFatLoc==FAT + 512) then
+
+				print "No FAT block";
+				[Physical_SP -2 ]=-1;
+				ireturn; 
+
+		endif;
+
+		print "free fat_loc=";
+		print FreeFatLoc;  
+ 
+	 [FreeFatLoc + 0]=File_name;
+	 [FreeFatLoc + 1]=0;
+	 [FreeFatLoc + 2]=free_block;
+	 
+	 load(1,free_block);
+
+	 alias i S5;
+	 i=0;
+	 while(i < 256) do
+				 
+		 [SCRATCHPAD + i]=-1;
+		 i=i+1;
+		 
+	 endwhile;
+
+	 store(1,free_block);
+
+	 
+	 [DISK_LIST + free_block]=1;
+	 [Physical_SP - 2]=0;
+	 
+	//store copies of the Disk Free List and the FAT entries from memory to the Disk
+	store(5,19);
+	store(6,20);
+	ireturn;
 endif;
 
 //if (SysCallNo==2) then
-   //Implementation of Open();,Interrupt NO. 2,arguments:filename,;
-   //Return value=Integer value called FileDescriptor,which is index of corresponding; 
-   //file entry in the Per-Process Open file table;
+	 //Implementation of Open();,Interrupt NO. 2,arguments:filename,;
+	 //Return value=Integer value called FileDescriptor,which is index of corresponding; 
+	 //file entry in the Per-Process Open file table;
  //print File_name;
 //endif;
 
 //if (SysCallNo==3) then
-    	
+			
  //print File_name;
 	
 //endif;
 
-//if (SysCallNo==4) then
-    	
- //print File_name;
+//Delete System Call
+if (SysCallNo==4) then
+	//Delete System Call
+	//Description:Deletes a file in the disk with the filename given as argument;
+	//System Call No:4;
+	//Argument:filename;
+	//Return Value: -1 (Failure) or 0 (Success);
+    print "Delete SysCall";
+    alias File_name S2;
+    File_name = [Physical_SP - 3];
+    print "filename";
+    print File_name;
 	
-//endif;
+	//Step 1
+	//Check the given file is exists in the disk
+    
+    alias FAT_Index S3;
+    FAT_Index =0;
+
+    while(FAT_Index < 64) do
+        
+        if ([FAT + 8*FAT_Index + 0]==File_name) then
+          	//File Found
+        	print "File exists";
+          	break;	
+        endif;  	
+      
+    	FAT_Index = FAT_Index + 1;
+    endwhile;
+
+    //File not found
+    if (FAT_Index==64) then
+     
+     print "File Not Found";
+     [Physical_SP - 2]=-1;
+     ireturn;	
+    endif;
+    print FAT_Index;
+    //Step 2
+    //Search in the system wide open file table
+    alias SWOFTI S4;
+    SWOFTI=0;
+    while(SWOFTI < 64) do
+        
+       
+        if ([FILE_TABLE + 2*SWOFTI + 0]==FAT_Index) then
+           //File FAT Index Found in the system wide open file table
+         print "File is open";
+         [Physical_SP - 2]=-1;
+         ireturn;
+        	
+        endif;
+      
+    	SWOFTI = SWOFTI + 1;
+    endwhile;
+   
+    //Step 3
+    alias basic_block S5;
+    basic_block=[FAT + 8*FAT_Index + 2];
+    print "basic_block";
+    print basic_block;
+    if (basic_block==-1) then
+    	print "Invalid Basic Block";
+    	[Physical_SP - 2]=0;
+    	ireturn;
+    endif;
+
+    load(1,basic_block);
+    alias DATAI S6;
+    alias DATAB S7;
+    DATAI=0;
+    while(DATAI<256) do
+        	
+      print [SCRATCHPAD + DATAI];
+      DATAB = [SCRATCHPAD + DATAI];
+      
+      print "DATAB";
+      print DATAB;
+      
+      if (DATAB==-1) then
+          	
+        break;   
+
+      endif;
+        	
+      load(1,DATAB);
+      alias j S8;
+      j=0;
+      while(j < 512) do
+          	
+        [SCRATCHPAD + j]=" ";
+        j = j + 1;
+      endwhile;
+      store(1,DATAB);
+      [DISK_LIST + DATAB]=0;     	
+      
+
+      DATAI = DATAI + 1;
+      load(1,basic_block);     		
+    endwhile;
+   //store(1,basic_block);
+    //Erase the content of the basic block
+    
+    load(1,basic_block);
+
+    alias i S9;
+    i=0;
+    while(i < 512) do
+        	
+      [SCRATCHPAD + i]=" ";
+      i = i + 1;
+    	
+    endwhile;
+    store(1,basic_block);
+
+    //Invalidate basic block entry in the disk free list
+
+    [DISK_LIST + basic_block]=0;
+
+    //Invalidate the file name and the basic block field in the FAT
+    //and set file size to 0
+    [FAT + 8*FAT_Index + 0]=-1;
+    [FAT + 8*FAT_Index + 1]= 0;
+    [FAT + 8*FAT_Index + 2]=-1;
+   
+    //Store FAT and Disk Free List from memory to disk
+    store(5,19);
+    store(6,20);
+    
+    //Return Success
+    [Physical_SP - 2]=0;
+    ireturn; 
+endif;
+
+print "Invalid System Call";
+[Physical_SP - 2]=-1;
+ireturn;
