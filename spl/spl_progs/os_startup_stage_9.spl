@@ -97,11 +97,11 @@ load(24,18);
 //Set MEM_LIST entries from 0 to 24 as used(1) and all other as unsed(0)
 alias j S2;
 j=0;
-while(j <= 25) do    	
+while(j <= 28) do    	
 	[MEM_LIST + j]=1;
 	j=j+1;
 endwhile;
-j=25;
+j=29;
 while(j< 64) do
 	[MEM_LIST + j]=0;
 	j=j+1;	
@@ -131,5 +131,8 @@ endwhile;
 [READY_LIST + 12] =R5;
 [READY_LIST + 13] =R6;
 [READY_LIST + 14] =R7;
+
+//Set the parent PID at 31 postion in the PCB
+[READY_LIST + 31]=0;
 
 ireturn;

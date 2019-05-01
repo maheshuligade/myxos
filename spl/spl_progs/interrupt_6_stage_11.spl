@@ -1,0 +1,262 @@
+alias Physical_SP S0;
+Physical_SP = (([PTBR + 2*(SP/512)]*512) + (SP%512));
+
+alias SysCallNo S1;
+SysCallNo = [Physical_SP - 1];
+
+if (SysCallNo==9) then
+	//Exec System Call
+	//Description:	Used to load and run a process in the space of currently running process.
+	//				The current process is overwritten by by new process i.e. the process
+	//				Data Structures and Memory of the current process is used by the the new process.
+	//System Call No: 9
+	//Intterupt No: 6
+	//Arguments: Filename
+	//Return Value:-1(Failure) or 0 (Success)
+	alias Filename S2;
+	Filename = [Physical_SP - 3];
+
+	//Step 1
+	//Check the given filename is exist in the Memory copy of the FAT	
+	alias FAT_Index S3;
+	FAT_Index=0;
+
+	while(FAT_Index < 64) do
+		if ([FAT + 8*FAT_Index + 0]==Filename) then
+			print "File Exists";
+			break;
+		endif;
+		FAT_Index = FAT_Index + 1;
+	endwhile;
+	if (FAT_Index==64) then
+		print "File Not Exists";
+		[Physical_SP - 2]=-1;
+		ireturn;	
+	endif;
+	//Step 2
+	//Fetch the Basic block of the file into the SCRATCHPAD
+	//This is to find the data blocks of the corresponding file,
+	//which will be the code blocks of the program
+	//if basic block is not valid return -1
+	if ([FAT + 8*FAT_Index + 2]==-1) then
+		print "Invalid Basic Block";
+		[Physical_SP -2]=-1;
+		ireturn;
+	endif;
+	load(1,[FAT + 8*FAT_Index + 2]);
+	
+	alias New_pros_pages S4;
+	New_pros_pages=0;
+	while([SCRATCHPAD + New_pros_pages]!=-1) do
+		if ([SCRATCHPAD + New_pros_pages]==""||[SCRATCHPAD + New_pros_pages]==-1) then
+			break;					
+		endif;
+		//print [SCRATCHPAD + New_pros_pages];
+		New_pros_pages=New_pros_pages+1;
+	endwhile;
+
+	if (New_pros_pages > 3) then
+		[Physical_SP -2]=-1;
+		ireturn;
+	
+	endif;
+	//Step 3 
+	//Step 4
+	alias Current_PID S5;
+	Current_PID = (PTBR - 1024)/8;
+
+	alias Current_PTBR S6;
+	Current_PTBR=PAGE_TABLE + 8*Current_PID;
+
+	alias Current_pros_pages S7;
+	Current_pros_pages=0;
+	alias i S8;
+	i=0;
+	alias Free_Pages S9;
+	Free_Pages=0;
+	alias Used_pages S10;
+	Used_pages=0;
+
+	while(i< 3) do
+		
+		if ([Current_PTBR + 2*i + 0]!=-1) then
+			Current_pros_pages=Current_pros_pages + 1;
+		endif;
+		i=i+1;
+	endwhile;
+	Current_pros_pages=Current_pros_pages - 1;
+	
+	//Check the no of code pages are greater for current process than new process
+
+	if (Current_pros_pages==New_pros_pages) then
+		i=0;
+		while(i<3) do
+			if([SCRATCHPAD + i]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;				
+			endif;
+			i=i+1;
+		endwhile;	
+	endif;
+
+	if (Current_pros_pages > New_pros_pages) then
+		//Deallocate extra pages in the MEM_LIST
+		i=0;
+		while(i < New_pros_pages) do
+			if([SCRATCHPAD + i]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+			endif;
+			i=i+1;
+		endwhile;	
+		while(i < Current_pros_pages) do	
+			[Current_PTBR + 2*i + 0]=-1;
+			[Current_PTBR + 2*i + 1]="00";
+			[MEM_LIST + [Current_PTBR + 2*i + 0]]=0;
+			i=i+1;	
+		endwhile;
+	endif;
+
+	//print New_pros_pages;
+	if (Current_pros_pages < New_pros_pages) then
+		
+		i=25;
+		Free_Pages=0;
+		while(i<64) do
+			if ([MEM_LIST + i]==0) then
+				Free_Pages=Free_Pages + 1;
+			endif;		
+			i=i+1;
+		endwhile;
+		print "Free_Pages";
+		print Free_Pages;
+		if (Free_Pages < New_pros_pages) then
+			print "Insufficient Memory";
+			[Physical_SP - 2]=-1;
+			ireturn;		
+		endif;
+
+		//[Current_PTBR + 2*i + 0]=[SCRATCHPAD + i];
+		i=0;
+		Used_pages=0;
+		while(i<Current_pros_pages) do
+			if([Current_PTBR +2*i + 0]!=-1) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+				Used_pages=Used_pages+1;
+			endif;
+			i=i+1;
+			//Used_pages=Used_pages + 1;
+		endwhile;
+		while(Used_pages<New_pros_pages) do
+			if ([MEM_LIST + i]==0) then
+				load([Current_PTBR + 2*i + 0],[SCRATCHPAD + i]);
+				[Current_PTBR + 2*i + 1]="01";
+				[MEM_LIST + [Current_PTBR + 2*i + 0]]=1;
+				Used_pages=Used_pages+1;	
+			endif;			
+			i=i+1;
+		endwhile;
+	endif;
+
+	//Step 5
+	//Close all files opened by the current process 
+	//by following the steps in the Close() System Call
+
+	alias PPFTIStart S11;
+	PPFTIStart=READY_LIST + 32*Current_PID +15;
+
+	alias fileDescriptor S12;
+	fileDescriptor = 0;
+	alias Current_PCB S13;
+	Current_PCB=Current_PTBR;
+
+	while(fileDescriptor < 8) do
+		//Check SWOFT validity
+		if ([PPFTIStart + 2*fileDescriptor + 0]==-1) then
+			//print "Invalid SWOFTI";
+			fileDescriptor = fileDescriptor + 1;
+			continue;
+		else
+			//Index into the SWOFT
+			alias SWOFTI S14;
+			SWOFTI=[PPFTIStart + 2*fileDescriptor];
+			//Check file is open or not stage 8
+			// if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+			// 	//print "File already closed";
+			// 	fileDescriptor=fileDescriptor + 1;
+			// 	continue;
+			// endif;
+		//File open validity is checked
+			//print "FileOpenCount";
+		//	print  [FILE_TABLE +2*SWOFTI + 1];
+
+
+			//Decrese the file open count
+			[FILE_TABLE + 2*SWOFTI + 1]=[FILE_TABLE + 2*SWOFTI + 1] - 1;
+
+			//Check the file open count is zero
+			if ([FILE_TABLE + 2*SWOFTI + 1]==0) then
+
+				//Set the entry of the FAT index in the SWOFT to invalid
+				[FILE_TABLE + 2*SWOFTI + 0]=-1; 
+			endif;
+				//Invalidate PPFT entry
+				[PPFTIStart + 2*fileDescriptor + 0]=-1;
+				[PPFTIStart + 2*fileDescriptor + 1]=-1;            
+			//endif;
+		endif;
+		fileDescriptor = fileDescriptor + 1;
+	endwhile;
+	
+	//Step 6
+	//Reset the SP to 3*512
+	SP=3*512; 
+
+	//Step 7
+	//Setting 0 to the top of the stack
+	[[PTBR + 2*3 + 0]*512]=0;
+	[PTBR + 2*3 + 1]="01";
+	//[[PTBR + 2*(SP/512)]*512 + (SP%512)]=0;
+	[Physical_SP - 2]=0;
+	//Step 8
+	//Return from the system call
+	ireturn;
+endif;
+
+if (SysCallNo==11) then
+	//Description:Gives the processID of the process which invoked this system call
+	//System Call No:11
+	//Interrupt Routine No:6
+	//Arguments:None
+	//Return Value:-1 (Failure) PID of the process which invoked the system call(Success).
+ 	alias Current_PID S2;
+ 	Current_PID =(PTBR - 1024)/8;
+ 	[Physical_SP - 2]=Current_PID;
+ 	ireturn;
+
+endif;
+
+if (SysCallNo==12) then
+	//Description:	Gives the processID of the parent process 
+	//				of the process which invoked this system call.
+	//System Call No:12
+	//Interrupt Routine No:6
+	//Arguments:None
+	//Return Value:-1 (Failure) or PID of the parent process which invoked the system call (Success).
+	alias Current_PID S2;
+ 	Current_PID =(PTBR - 1024)/8;
+ 	//[Physical_SP - 2]=Current_PID;
+
+	alias Parent_PID S3;
+	Parent_PID=[READY_LIST + 32*Current_PID + 31];
+	[Physical_SP - 2]=Parent_PID;
+	ireturn;
+endif;
+
+print "Invalid SysCallNo";
+[Physical_SP - 2]=-1;
+ireturn;
